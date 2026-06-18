@@ -6,7 +6,7 @@ build/
 *.xcuserstate
 
 # Config secretos
-Secrets.xcconfig
+Core/Utils/Secrets.xcconfig
 
 # Swift Package Manager
 .build/
