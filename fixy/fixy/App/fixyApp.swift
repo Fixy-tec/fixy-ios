@@ -16,7 +16,7 @@ struct fixyApp: App {
         WindowGroup {
             // El "Semáforo" de la app
             if sessionManager.isAuthenticated {
-                DashboardView()
+                HomeView()
                     .environment(sessionManager) // Lo inyectamos para que las vistas hijas lo puedan usar
             } else {
                 LoginView()
