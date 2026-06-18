@@ -10,6 +10,7 @@ import SwiftUI
 struct RegisterView: View {
     @Environment(\.dismiss) var dismiss
     @State private var currentStep = 1
+    @State private var viewModel = RegisterViewModel()
     
     // MARK: - Estados de Datos (Formulario)
     // Paso 1
@@ -38,7 +39,7 @@ struct RegisterView: View {
     @State private var portfolio = ""
     
     // Variables para validación de base de datos
-    @State private var errorMessage: String? = nil
+//@State private var errorMessage: String? = nil
     
     var body: some View {
         VStack(spacing: 0) {
@@ -309,7 +310,7 @@ struct RegisterView: View {
                 .cornerRadius(12)
                 .padding(.top, 8)
                 
-                if let error = errorMessage {
+                if let error = viewModel.errorMessage {
                     Text(error)
                         .foregroundColor(Color("FixyPointsNegative"))
                         .font(.caption)
@@ -347,12 +348,34 @@ struct RegisterView: View {
     
     // MARK: - Lógica de Navegación
     private func goNext() {
-        if currentStep < 5 {
-            withAnimation { currentStep += 1 }
-        } else {
-            print("Enviando a Supabase...")
+            if currentStep < 5 {
+                withAnimation { currentStep += 1 }
+            } else {
+                // Lógica final de registro
+                Task {
+                    let success = await viewModel.registerUser(
+                        email: email,
+                        password: password,
+                        fullName: fullName,
+                        career: career,
+                        cycle: cycle,
+                        technologies: selectedTechs,
+                        avatarId: selectedAvatar,
+                        whatsapp: whatsapp,
+                        bio: personalDescription,
+                        github: github,
+                        linkedin: linkedin,
+                        portfolio: portfolio
+                    )
+                    
+                    if success {
+                        // Si todo salió bien, cerramos el registro.
+                        // El SessionManager detectará el login automáticamente y nos mandará al Dashboard.
+                        dismiss()
+                    }
+                }
+            }
         }
-    }
     
     private func goBack() {
         if currentStep > 1 {
