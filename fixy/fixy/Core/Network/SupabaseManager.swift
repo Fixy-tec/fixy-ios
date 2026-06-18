@@ -19,13 +19,19 @@ final class SupabaseManager {
         guard let infoDictionary = Bundle.main.infoDictionary,
               let urlString = infoDictionary["SupabaseURL"] as? String,
               let anonKey = infoDictionary["SupabaseAnonKey"] as? String,
-              let url = URL(string: urlString) else {
-            fatalError("Error crítico: Faltan las credenciales de Supabase en Secrets.xcconfig o no están en el Info.plist")
+              let url = URL(string: "https://\(urlString)") else {
+              fatalError("🚨 Error crítico: Faltan las credenciales de Supabase")
         }
         
-        // 2. Inicializar el cliente
-        self.client = SupabaseClient(supabaseURL: url, supabaseKey: anonKey)
-        
-        print("Supabase Manager inicializado correctamente")
+        // 2. Inicializar el cliente con la nueva configuración de Auth
+                self.client = SupabaseClient(
+                    supabaseURL: url,
+                    supabaseKey: anonKey,
+                    options: SupabaseClientOptions(
+                        auth: .init(emitLocalSessionAsInitialSession: true)
+                    )
+                )
+                
+                print("✅ Supabase Manager inicializado correctamente")
     }
 }

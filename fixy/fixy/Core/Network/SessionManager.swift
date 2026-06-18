@@ -22,11 +22,13 @@ final class SessionManager {
     }
     
     private func startListeningToAuthChanges() async {
-        // Al usar @MainActor, ya no necesitamos el "DispatchQueue.main.async"
-        // Swift se encarga automáticamente de actualizar esto de forma segura.
-        for await state in SupabaseManager.shared.client.auth.authStateChanges {
-            self.currentUser = state.session?.user
-            self.isAuthenticated = state.session != nil
+            for await state in SupabaseManager.shared.client.auth.authStateChanges {
+                let session = state.session
+                self.currentUser = session?.user
+                
+                // Validamos que la sesión exista y que NO esté expirada
+                let isExpired = session?.isExpired ?? true
+                self.isAuthenticated = session != nil && !isExpired
         }
     }
     
