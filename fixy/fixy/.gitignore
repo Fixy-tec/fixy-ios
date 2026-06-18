@@ -1,3 +1,15 @@
 
-*.xcconfig
+# Xcode
+DerivedData/
+build/
+*.xcuserdata
+*.xcuserstate
+
+# Config secretos
 Secrets.xcconfig
+
+# Swift Package Manager
+.build/
+
+# macOS
+.DS_Store
