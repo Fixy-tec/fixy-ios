@@ -9,9 +9,19 @@ import SwiftUI
 
 @main
 struct fixyApp: App {
+    // Inicializamos el SessionManager a nivel de aplicación
+    @State private var sessionManager = SessionManager()
+    
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            // El "Semáforo" de la app
+            if sessionManager.isAuthenticated {
+                DashboardView()
+                    .environment(sessionManager) // Lo inyectamos para que las vistas hijas lo puedan usar
+            } else {
+                LoginView()
+                    .environment(sessionManager)
+            }
         }
     }
 }
