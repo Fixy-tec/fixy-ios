@@ -224,86 +224,101 @@ struct CreateRequestView: View {
     }
     
     // MARK: - Paso 3: Condiciones
-    
-    private var stepThreeConditions: some View {
-        ScrollView(showsIndicators: false) {
-            VStack(alignment: .leading, spacing: 24) {
-                headerText(title: "Condiciones", subtitle: "Define la dificultad, el plazo y si hay compensacion economica.")
-                
-                // Nivel de Dificultad
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Nivel de dificultad").font(.headline)
+        
+        private var stepThreeConditions: some View {
+            ScrollView(showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 24) {
+                    headerText(title: "Condiciones", subtitle: "Define la dificultad, el plazo y si hay compensacion economica.")
                     
-                    HStack(spacing: 12) {
-                        ForEach(1...5, id: \.self) { level in
-                            Button(action: { difficultyLevel = level }) {
-                                VStack(spacing: 4) {
-                                    Image(systemName: difficultyLevel >= level ? "bolt.fill" : "bolt")
-                                    Text("\(level)").font(.headline)
+                    // Nivel de Dificultad
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Nivel de dificultad").font(.headline)
+                        
+                        // 🌟 Cambio aquí: HStack con spacing 0 y botones expandidos al máximo ancho
+                        HStack(spacing: 0) {
+                            ForEach(1...5, id: \.self) { level in
+                                Button(action: { difficultyLevel = level }) {
+                                    VStack(spacing: 4) {
+                                        Image(systemName: difficultyLevel >= level ? "bolt.fill" : "bolt")
+                                        Text("\(level)").font(.headline)
+                                    }
+                                    .foregroundColor(difficultyLevel == level ? Color("FixyPrimary") : .gray)
+                                    .frame(width: 50, height: 50)
+                                    .background(difficultyLevel == level ? Color("FixyPrimary").opacity(0.15) : Color.clear)
+                                    .overlay(Circle().stroke(difficultyLevel == level ? Color("FixyPrimary") : Color.gray.opacity(0.3), lineWidth: 2))
+                                    .clipShape(Circle())
                                 }
-                                .foregroundColor(difficultyLevel == level ? Color("FixyPrimary") : .gray)
-                                .frame(width: 50, height: 50)
-                                .background(difficultyLevel == level ? Color("FixyPrimary").opacity(0.15) : Color.clear)
-                                .overlay(Circle().stroke(difficultyLevel == level ? Color("FixyPrimary") : Color.gray.opacity(0.3), lineWidth: 2))
-                                .clipShape(Circle())
+                                .frame(maxWidth: .infinity) // Esto distribuye los círculos perfectamente
                             }
                         }
+                        
+                        HStack {
+                            Text(difficultyText(for: difficultyLevel))
+                            Spacer()
+                            Text("+\(difficultyLevel * 60) pts base")
+                                .fontWeight(.bold)
+                                .foregroundColor(.teal)
+                        }
+                        .font(.subheadline)
                     }
                     
-                    HStack {
-                        Text(difficultyText(for: difficultyLevel))
-                        Spacer()
-                        Text("+\(difficultyLevel * 60) pts base")
-                            .fontWeight(.bold)
-                            .foregroundColor(.teal)
-                    }
-                    .font(.subheadline)
-                }
-                
-                // Fecha Límite
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Fecha limite estimada").font(.headline)
-                    HStack {
-                        Image(systemName: "calendar")
-                        DatePicker("", selection: $deadline, displayedComponents: .date)
-                            .labelsHidden()
-                        Spacer()
-                    }
-                    .padding()
-                    .background(Color(UIColor.secondarySystemBackground))
-                    .cornerRadius(12)
-                }
-                
-                // Beneficio Económico
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Beneficio economico (opcional)").font(.headline)
-                    TextField("0.00", text: $price)
-                        .keyboardType(.decimalPad)
+                    // Fecha Límite
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Fecha limite estimada").font(.headline)
+                        HStack {
+                            Image(systemName: "calendar")
+                            DatePicker("", selection: $deadline, displayedComponents: .date)
+                                .labelsHidden()
+                            Spacer()
+                        }
                         .padding()
                         .background(Color(UIColor.secondarySystemBackground))
                         .cornerRadius(12)
+                    }
                     
-                    Text("Si lo dejas vacio se mostrara como \"Voluntario / Solo Puntos\"")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                    // Beneficio Económico
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Beneficio economico (opcional)").font(.headline)
+                        TextField("0.00", text: $price)
+                            .keyboardType(.decimalPad)
+                            .padding()
+                            .background(Color(UIColor.secondarySystemBackground))
+                            .cornerRadius(12)
+                        
+                        Text("Si lo dejas vacio se mostrara como \"Voluntario / Solo Puntos\"")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    // Tarjeta de Resumen Final Actualizada
+                    VStack(spacing: 12) {
+                        Text("Resumen").font(.headline).foregroundColor(Color("FixyPrimary")).frame(maxWidth: .infinity, alignment: .leading)
+                        
+                        summaryRow(title: "Tipo:", value: selectedType)
+                        summaryRow(title: "Titulo:", value: title.isEmpty ? "Sin titulo" : title)
+                        summaryRow(title: "Tags:", value: selectedTags.isEmpty ? "Ninguno" : selectedTags.joined(separator: ", "))
+                        
+                        // 🌟 Nuevos campos en el resumen
+                        summaryRow(title: "Nivel:", value: "Nivel \(difficultyLevel) (+\(difficultyLevel * 60) pts)")
+                        summaryRow(title: "Limite:", value: deadline.formatted(date: .abbreviated, time: .omitted))
+                        
+                        // Lógica para mostrar precio o voluntario
+                        let cleanPrice = price.replacingOccurrences(of: ",", with: ".")
+                        if let priceValue = Double(cleanPrice), priceValue > 0 {
+                            summaryRow(title: "Pago:", value: "S/ \(String(format: "%.2f", priceValue))")
+                        } else {
+                            summaryRow(title: "Pago:", value: "Voluntario")
+                        }
+                    }
+                    .padding()
+                    .background(Color.blue.opacity(0.05))
+                    .cornerRadius(16)
+                    
                 }
-                
-                // Tarjeta de Resumen Final
-                VStack(spacing: 12) {
-                    Text("Resumen").font(.headline).foregroundColor(Color("FixyPrimary")).frame(maxWidth: .infinity, alignment: .leading)
-                    summaryRow(title: "Tipo:", value: selectedType)
-                    summaryRow(title: "Titulo:", value: title.isEmpty ? "Sin titulo" : title)
-                    summaryRow(title: "Tags:", value: selectedTags.isEmpty ? "Ninguno" : selectedTags.joined(separator: ", "))
-                }
-                .padding()
-                .background(Color.blue.opacity(0.05))
-                .cornerRadius(16)
-                
+                .padding(.horizontal, 20)
+                .padding(.bottom, 40)
             }
-            .padding(.horizontal, 20)
-            .padding(.bottom, 40)
         }
-    }
     
     // MARK: - Componentes Reutilizables y Funciones
     
@@ -366,13 +381,28 @@ struct CreateRequestView: View {
     }
     
     private func goNext() {
-        if currentStep < 3 {
-            withAnimation { currentStep += 1 }
-        } else {
-            print("🚀 Publicando solicitud con: \(title), \(selectedTags.count) tags y dificultad \(difficultyLevel)")
-            dismiss() // Cierra la ventana modal temporalmente
+            if currentStep < 3 {
+                withAnimation { currentStep += 1 }
+            } else {
+                // Estamos en el paso 3 y el usuario presionó "Publicar solicitud"
+                Task {
+                    let success = await viewModel.createRequest(
+                        type: selectedType,
+                        title: title,
+                        description: description,
+                        tags: selectedTags,
+                        difficulty: difficultyLevel,
+                        deadline: deadline,
+                        priceString: price
+                    )
+                    
+                    if success {
+                        // Si se guardó en la base de datos, cerramos el modal
+                        dismiss()
+                    }
+                }
+            }
         }
-    }
     
     private func goBack() {
         if currentStep > 1 {
