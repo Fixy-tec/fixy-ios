@@ -183,7 +183,7 @@ struct RequestCardView: View {
         .background(Color(UIColor.secondarySystemBackground))
         .cornerRadius(16)
     }
-}
+}	
 
 #Preview {
     SearchView()
