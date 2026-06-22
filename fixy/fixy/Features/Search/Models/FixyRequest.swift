@@ -7,7 +7,6 @@
 
 import Foundation
 
-// Definición pura de los datos de una solicitud
 struct FixyRequest: Identifiable {
     let id = UUID()
     let type: String
@@ -20,4 +19,5 @@ struct FixyRequest: Identifiable {
     let price: Double?
     let expiration: String
     let applicants: Int
+    let difficulty: Int
 }
