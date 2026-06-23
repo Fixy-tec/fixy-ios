@@ -86,7 +86,7 @@ struct HomeView: View {
                     Image("FixyLogo") // ⚠️ Cambia esto por el nombre exacto de tu imagen en Assets
                         .resizable()
                         .scaledToFit()
-                        .frame(height: 60) // Altura ajustada para que no se vea gigante
+                        .frame(height: 75) // Altura ajustada para que no se vea gigante
                 }
                 
                 // Lado Derecho: CAMPANA DE NOTIFICACIONES
@@ -96,7 +96,7 @@ struct HomeView: View {
                             Image(systemName: "bell")
                                 .font(.system(size: 16, weight: .semibold))
                                 .foregroundColor(.blue)
-                                .frame(width: 36, height: 36)
+                                .frame(width: 50, height: 50)
                                 .background(Color.blue.opacity(0.1))
                                 .clipShape(Circle())
                             
