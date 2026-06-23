@@ -7,218 +7,168 @@
 
 import SwiftUI
 
-// Estructura para manejar las notificaciones dinámicamente y poder borrarlas
-struct FixyNotification: Identifiable {
-    let id = UUID()
-    let text: String
-    let time: String
-    let isUnread: Bool
-}
-
 struct HomeView: View {
+    @Environment(MainNavigationViewModel.self) var navViewModel
     @State private var viewModel = HomeViewModel()
-    
-    // Lista interactiva de notificaciones
-    @State private var notifications = [
-        FixyNotification(text: "Ana Castillo ha solicitado tu ayuda para una asesoría.", time: "hace 2 horas", isUnread: true),
-        FixyNotification(text: "Un estudiante ha visto tu perfil de contacto.", time: "ayer", isUnread: false)
-    ]
+    @State private var showCreateModal = false
     
     var body: some View {
         NavigationStack {
-            // Cambiamos ScrollView por List para habilitar Swipe Actions nativos
-            List {
-                // SECCIÓN SUPERIOR: Header y Tarjeta Principal
-                VStack(spacing: 24) {
-                    headerSection
+            ScrollView(showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 25) {
                     
-                    if viewModel.isLoading {
-                        ProgressView().padding(.top, 50)
-                    } else {
-                        welcomeCard
+                    // MARK: - Tarjeta Bienvenida con Degradado (Diseño Fiel)
+                    VStack(alignment: .leading, spacing: 18) {
+                        HStack {
+                            Image(systemName: "sparkles")
+                            Text("Bienvenido, \(viewModel.firstName)")
+                                .font(.title2).fontWeight(.bold)
+                        }
+                        
+                        Text("Encontramos nuevas solicitudes compatibles con tus habilidades.")
+                            .font(.subheadline).opacity(0.9)
+                        
+                        // Skills Reales de Supabase
+                        FlowLayout(spacing: 8) {
+                            ForEach(viewModel.technologies, id: \.self) { tech in
+                                Text(tech)
+                                    .font(.caption)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 6)
+                                    .background(.white.opacity(0.2)) // Fondo semi-transparente
+                                    .clipShape(Capsule())
+                            }
+                        }
+                        
+                        // Acciones de Navegación
+                        HStack(spacing: 15) {
+                            Button { navViewModel.selectedTab = .buscar } label: {
+                                Label("Explorar", systemImage: "magnifyingglass")
+                                    .frame(maxWidth: .infinity).padding().background(.white)
+                                    .foregroundColor(Color.blue).cornerRadius(12).fontWeight(.bold) // Texto azul
+                            }
+                            
+                            Button { showCreateModal = true } label: {
+                                Label("Crear", systemImage: "plus")
+                                    .frame(maxWidth: .infinity).padding()
+                                    .background(.white.opacity(0.2)).cornerRadius(12) // Semi-transparente
+                                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(.white, lineWidth: 1))
+                                    .fontWeight(.bold)
+                            }
+                        }
+                    }
+                    .padding(20)
+                    // 👇 AQUÍ ESTÁ EL DEGRADADO EXACTO DE TU IMAGEN
+                    .background(
+                        LinearGradient(
+                            colors: [Color.cyan, Color.blue],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .foregroundColor(.white)
+                    .cornerRadius(20) // Bordes redondeados
+                    .padding(.horizontal)
+                    .padding(.top, 10)
+                    
+                    // MARK: - Notificaciones Recientes
+                    notificationSection
+                }
+            }
+            .background(Color(UIColor.systemBackground).ignoresSafeArea())
+            .task { await viewModel.loadUserData() }
+            .fullScreenCover(isPresented: $showCreateModal) { CreateRequestView() }
+            
+            // MARK: - Barra Superior (Logo y Campana)
+            .toolbar {
+                // Lado Izquierdo: LOGO
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Image("FixyLogo") // ⚠️ Cambia esto por el nombre exacto de tu imagen en Assets
+                        .resizable()
+                        .scaledToFit()
+                        .frame(height: 60) // Altura ajustada para que no se vea gigante
+                }
+                
+                // Lado Derecho: CAMPANA DE NOTIFICACIONES
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    NavigationLink(destination: NotificationsView()) {
+                        ZStack(alignment: .topTrailing) {
+                            Image(systemName: "bell")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundColor(.blue)
+                                .frame(width: 36, height: 36)
+                                .background(Color.blue.opacity(0.1))
+                                .clipShape(Circle())
+                            
+                            // Burbuja roja (Solo aparece si hay notificaciones sin leer)
+                            if viewModel.unreadCount > 0 {
+                                Text("\(viewModel.unreadCount)")
+                                    .font(.system(size: 10, weight: .bold))
+                                    .foregroundColor(.white)
+                                    .frame(width: 16, height: 16)
+                                    .background(Color.red)
+                                    .clipShape(Circle())
+                                    .offset(x: 2, y: -2)
+                            }
+                        }
                     }
                 }
-                .listRowSeparator(.hidden)
-                .listRowBackground(Color.clear)
-                .listRowInsets(EdgeInsets(top: 10, leading: 20, bottom: 20, trailing: 20))
-                
-                // SECCIÓN INFERIOR: Actividad y Notificaciones
-                Section {
-                    ForEach(notifications) { notif in
-                        notificationRow(notif)
-                            // 🌟 AQUÍ ESTÁ LA MAGIA: Deslizar para eliminar
-                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                                Button(role: .destructive) {
-                                    withAnimation {
-                                        notifications.removeAll { $0.id == notif.id }
-                                    }
-                                } label: {
-                                    Label("Eliminar", systemImage: "trash")
+            }
+        }
+    } // 👈 ¡ESTA ES LA PRIMERA LLAVE QUE FALTABA! (Cierra la variable 'body')
+    
+    // MARK: - Sección de Notificaciones
+    private var notificationSection: some View {
+        VStack(alignment: .leading, spacing: 15) {
+            Label("NOTIFICACIONES RECIENTES", systemImage: "bell")
+                .font(.caption).fontWeight(.bold).foregroundColor(.secondary).padding(.horizontal)
+            
+            if viewModel.recentNotifications.isEmpty {
+                Text("No tienes notificaciones recientes.")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .padding(.horizontal)
+            } else {
+                ForEach(viewModel.recentNotifications) { notification in
+                    // Si la notificación tiene un ID de solicitud, nos lleva al Detalle real
+                    NavigationLink(destination: Group {
+                        if let reqId = notification.related_request_id {
+                            RequestDetailView(requestId: reqId)
+                        } else {
+                            Text("Esta notificación no está enlazada a una solicitud")
+                        }
+                    }) {
+                        HStack(alignment: .top, spacing: 15) {
+                            Circle()
+                                .fill(notification.is_read ? Color.clear : Color.cyan)
+                                .frame(width: 8, height: 8)
+                                .padding(.top, 5)
+                            
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(notification.title)
+                                    .font(.subheadline)
+                                    .fontWeight(notification.is_read ? .regular : .medium)
+                                    .foregroundColor(.primary)
+                                    .multilineTextAlignment(.leading)
+                                
+                                if let msg = notification.message {
+                                    Text(msg).font(.caption).foregroundColor(.secondary).lineLimit(1)
                                 }
                             }
+                            Spacer()
+                        }
+                        .padding()
+                        .background(Color(UIColor.secondarySystemBackground))
+                        .cornerRadius(15)
                     }
-                } header: {
-                    HStack {
-                        Image(systemName: "bell.badge")
-                        Text("NOTIFICACIONES RECIENTES")
-                            .font(.caption)
-                            .fontWeight(.bold)
-                    }
-                    .foregroundColor(.secondary)
-                    .padding(.bottom, 8)
-                }
-                .listRowSeparator(.visible)
-                .listRowBackground(Color.clear)
-                .listRowInsets(EdgeInsets(top: 12, leading: 20, bottom: 12, trailing: 20))
-                
-                // Espaciador final para el TabBar
-                Spacer().frame(height: 80)
-                    .listRowSeparator(.hidden)
-                    .listRowBackground(Color.clear)
-            }
-            .listStyle(.plain) // Quita el fondo gris genérico de las listas de Apple
-            .background(Color(UIColor.systemBackground).ignoresSafeArea())
-            .task {
-                await viewModel.fetchProfile()
-            }
-        }
-    }
-    
-    // MARK: - Componentes de la Vista
-    
-    private var headerSection: some View {
-        HStack {
-            Image("FixyLogo")
-                .resizable()
-                .scaledToFit()
-                .frame(height: 32)
-            
-            Spacer()
-            
-            // 🔔 AHORA ES UN BOTÓN REAL
-            Button(action: {
-                print("Campana presionada. ¡Aquí puedes abrir un modal!")
-            }) {
-                ZStack(alignment: .topTrailing) {
-                    Image(systemName: "bell")
-                        .font(.system(size: 24))
-                        .foregroundColor(Color("FixyPrimary"))
-                        .padding(8)
-                        .background(Color("FixyPrimary").opacity(0.1))
-                        .clipShape(Circle())
-                    
-                    if !notifications.isEmpty {
-                        Text("\(notifications.count)")
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(Color.red)
-                            .clipShape(Capsule())
-                            .offset(x: 4, y: -4)
-                    }
+                    .padding(.horizontal)
                 }
             }
         }
     }
-    
-    private var welcomeCard: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack {
-                Image(systemName: "sparkles")
-                    .foregroundColor(.white)
-                Text("Bienvenido, \(viewModel.userName)")
-                    .font(.title2)
-                    .fontWeight(.bold)
-                    .foregroundColor(.white)
-            }
-            
-            Text("Encontramos nuevas solicitudes compatibles con tus habilidades.")
-                .font(.subheadline)
-                .foregroundColor(.white.opacity(0.9))
-            
-            // 🌟 CHIPS INTELIGENTES: Usando nuestro nuevo FlowLayout
-            if !viewModel.technologies.isEmpty {
-                FlowLayout(spacing: 8) {
-                    ForEach(viewModel.technologies, id: \.self) { tech in
-                        Text(tech)
-                            .font(.caption)
-                            .fontWeight(.medium)
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
-                            .background(Color.white.opacity(0.2))
-                            .clipShape(Capsule())
-                    }
-                }
-            }
-            
-            // Botones de acción
-            HStack(spacing: 12) {
-                Button(action: {}) {
-                    HStack {
-                        Image(systemName: "magnifyingglass")
-                        Text("Explorar")
-                    }
-                    .font(.subheadline)
-                    .fontWeight(.bold)
-                    .foregroundColor(Color("FixyPrimary"))
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
-                    .background(Color.white)
-                    .cornerRadius(12)
-                }
-                
-                Button(action: {}) {
-                    HStack {
-                        Image(systemName: "plus")
-                        Text("Crear")
-                    }
-                    .font(.subheadline)
-                    .fontWeight(.bold)
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
-                    .background(Color.white.opacity(0.2))
-                    .cornerRadius(12)
-                }
-            }
-            .padding(.top, 4)
-        }
-        .padding(20)
-        .background(
-            LinearGradient(
-                colors: [Color.teal, Color("FixyPrimary")],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        )
-        .cornerRadius(20)
-    }
-    
-    // Fila visual de cada notificación
-    private func notificationRow(_ notif: FixyNotification) -> some View {
-        HStack(alignment: .top, spacing: 12) {
-            Circle()
-                .fill(notif.isUnread ? Color.teal : Color.gray.opacity(0.5))
-                .frame(width: 8, height: 8)
-                .padding(.top, 6)
-            
-            VStack(alignment: .leading, spacing: 4) {
-                Text(notif.text)
-                    .font(.subheadline)
-                    .fontWeight(notif.isUnread ? .bold : .medium)
-                    .foregroundColor(.primary)
-                
-                Text(notif.time)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-        }
-        .padding(.vertical, 4)
-    }
-}
+} // 👈 ¡ESTA ES LA SEGUNDA LLAVE QUE FALTABA! (Cierra el 'struct HomeView')
 
 #Preview {
     HomeView()
+        .environment(MainNavigationViewModel())
 }

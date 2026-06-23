@@ -56,6 +56,7 @@ struct MainNavigationView: View {
         }
         // Aplica el color principal de la app al ítem seleccionado
         .tint(Color("FixyPrimary"))
+        .environment(viewModel)
     }
 }
 
