@@ -9,77 +9,78 @@ import SwiftUI
 
 struct SearchView: View {
     @State private var viewModel = SearchViewModel()
+    @State private var showCreateModal = false
     
-    // Filtros disponibles
     let filters = ["Todos", "Asesoria", "Proyecto"]
     
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
                 
-                // MARK: - Barra de Búsqueda y Filtros
-                VStack(spacing: 16) {
-                    // Search Bar
-                    HStack {
-                        Image(systemName: "magnifyingglass").foregroundColor(.secondary)
-                        TextField("Buscar por título, tecnología...", text: $viewModel.searchText)
-                            .autocapitalization(.none)
-                            .disableAutocorrection(true)
-                    }
-                    .padding(12)
-                    .background(Color(UIColor.secondarySystemBackground))
-                    .cornerRadius(12)
-                    .padding(.horizontal)
-                    
-                    // Píldoras de Filtro
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 10) {
-                            ForEach(filters, id: \.self) { filter in
-                                Button(action: {
-                                    withAnimation { viewModel.selectedFilter = filter }
-                                }) {
-                                    Text(filter)
-                                        .font(.subheadline)
-                                        .fontWeight(.medium)
-                                        .padding(.horizontal, 16)
-                                        .padding(.vertical, 8)
-                                        .background(viewModel.selectedFilter == filter ? Color("FixyPrimary") : Color(UIColor.secondarySystemBackground))
-                                        .foregroundColor(viewModel.selectedFilter == filter ? .white : .primary)
-                                        .clipShape(Capsule())
+                // BARRA DE BÚSQUEDA (Reactiva)
+                HStack {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundColor(.secondary)
+                    TextField("Buscar por título o tecnología...", text: $viewModel.searchText)
+                        .autocapitalization(.none)
+                        .disableAutocorrection(true)
+                }
+                .padding(12)
+                .background(Color(UIColor.secondarySystemBackground))
+                .cornerRadius(12)
+                .padding([.horizontal, .top])
+                
+                // PÍLDORAS DE FILTRADO (Reactiva)
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 10) {
+                        ForEach(filters, id: \.self) { filter in
+                            Button(action: {
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                    viewModel.selectedFilter = filter
                                 }
+                            }) {
+                                Text(filter)
+                                    .font(.subheadline)
+                                    .fontWeight(.medium)
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 8)
+                                    .background(viewModel.selectedFilter == filter ? Color("FixyPrimary") : Color(UIColor.secondarySystemBackground))
+                                    .foregroundColor(viewModel.selectedFilter == filter ? .white : .primary)
+                                    .clipShape(Capsule())
                             }
                         }
-                        .padding(.horizontal)
                     }
-                    .padding(.bottom, 10)
+                    .padding(.horizontal)
                 }
-                .padding(.top, 10)
+                .padding(.vertical, 14)
                 
-                // MARK: - Lista de Resultados Dinámica
+                // LISTADO DE RESULTADOS
                 if viewModel.isLoading {
                     Spacer()
-                    ProgressView("Buscando solicitudes...")
+                    ProgressView("Cargando solicitudes...")
                     Spacer()
                 } else if viewModel.filteredRequests.isEmpty {
                     Spacer()
                     VStack(spacing: 12) {
-                        Image(systemName: "doc.text.magnifyingglass").font(.system(size: 40)).foregroundColor(.gray)
-                        Text("No se encontraron solicitudes abiertas.").foregroundColor(.secondary)
+                        Image(systemName: "doc.text.magnifyingglass")
+                            .font(.system(size: 40))
+                            .foregroundColor(.gray)
+                        Text("No se encontraron solicitudes que coincidan.")
+                            .foregroundColor(.secondary)
                     }
                     Spacer()
                 } else {
                     ScrollView {
                         LazyVStack(spacing: 16) {
                             ForEach(viewModel.filteredRequests) { request in
-                                // 🌟 AQUÍ ESTÁ LA MAGIA DE LA NAVEGACIÓN
                                 NavigationLink(destination: RequestDetailView(requestId: request.id)) {
                                     requestCard(request)
                                 }
-                                .buttonStyle(PlainButtonStyle()) // Evita que la tarjeta se vuelva azul al tocarla
+                                .buttonStyle(PlainButtonStyle())
                             }
                         }
-                        .padding()
-                        .padding(.bottom, 80) // Espacio para que el TabBar no tape la última tarjeta
+                        .padding(.horizontal)
+                        .padding(.bottom, 90) // Evita solapamiento con el TabBar inferior
                     }
                 }
             }
@@ -87,19 +88,31 @@ struct SearchView: View {
             .navigationBarTitleDisplayMode(.large)
             .background(Color(UIColor.systemBackground).ignoresSafeArea())
             .task {
-                // Descarga los datos cuando la pantalla aparece
                 await viewModel.fetchRequests()
+            }
+            // BOTÓN "+" PARA CREAR SOLICITUDES
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button(action: { showCreateModal = true }) {
+                        Image(systemName: "plus")
+                            .font(.title3)
+                            .fontWeight(.semibold)
+                            .foregroundColor(Color("FixyPrimary"))
+                    }
+                }
+            }
+            .fullScreenCover(isPresented: $showCreateModal) {
+                CreateRequestView()
             }
         }
     }
     
-    // MARK: - Diseño de la Tarjeta (Card)
+    // DISEÑO DE TARJETA EXCLUSIVO DE LA BASE DE DATOS
     private func requestCard(_ request: SearchRequestDTO) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            // Fila 1: Tipo y Puntos
+        let isAsesoria = request.type.lowercased() == "asesoria"
+        
+        return VStack(alignment: .leading, spacing: 12) {
             HStack {
-                // 🚀 Aquí reemplazamos el "rocket" por "lightbulb.fill" para proyectos y "doc.text.fill" para asesorías
-                let isAsesoria = request.type.lowercased() == "asesoria"
                 HStack(spacing: 4) {
                     Image(systemName: isAsesoria ? "doc.text.fill" : "lightbulb.fill")
                     Text(request.type.capitalized)
@@ -116,22 +129,22 @@ struct SearchView: View {
                     Image(systemName: "bolt.fill").foregroundColor(.yellow)
                     Text("+\(request.points_reward) pts").fontWeight(.bold)
                 }
+                .font(.subheadline)
             }
             
-            // Fila 2: Título
             Text(request.title)
                 .font(.headline)
                 .lineLimit(2)
                 .multilineTextAlignment(.leading)
+                .foregroundColor(.primary)
             
-            // Fila 3: Tecnologías (Mostramos máximo 3 para no saturar la tarjeta)
-            HStack(spacing: 8) {
+            FlowLayout(spacing: 6) {
                 ForEach(request.technologies.prefix(3), id: \.self) { tech in
                     Text(tech)
                         .font(.caption2)
                         .padding(.horizontal, 8).padding(.vertical, 4)
                         .background(Color(UIColor.tertiarySystemBackground))
-                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.gray.opacity(0.2), lineWidth: 1))
+                        .cornerRadius(6)
                 }
                 if request.technologies.count > 3 {
                     Text("+\(request.technologies.count - 3)")
@@ -139,16 +152,16 @@ struct SearchView: View {
                 }
             }
             
-            Divider()
+            Divider().padding(.vertical, 2)
             
-            // Fila 4: Creador y Dificultad
             HStack {
-                HStack(spacing: 6) {
-                    Image(systemName: "person.circle.fill").foregroundColor(.secondary)
-                    Text(request.profiles?.full_name ?? "Usuario").font(.subheadline).foregroundColor(.secondary)
-                }
+                Label(request.profiles?.full_name ?? "Estudiante", systemImage: "person.circle.fill")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
                 Spacer()
-                Text("Dificultad \(request.difficulty)/5").font(.caption).foregroundColor(.secondary)
+                Text("Dificultad \(request.difficulty)/5")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
             }
         }
         .padding()
