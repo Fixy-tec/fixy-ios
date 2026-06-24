@@ -17,6 +17,8 @@ struct SearchRequestDTO: Decodable, Identifiable {
     let points_reward: Int
     let status: String
     let created_at: String
+    let price: Double?
+    let deadline: String
     let profiles: SearchProfileDTO?
 }
 
