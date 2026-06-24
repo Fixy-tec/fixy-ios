@@ -9,257 +9,149 @@ import SwiftUI
 
 struct SearchView: View {
     @State private var viewModel = SearchViewModel()
-    @State private var showAdvancedFilters = false
-    @State private var showCreateRequest = false
+    
+    // Filtros disponibles
+    let filters = ["Todos", "Asesoria", "Proyecto"]
     
     var body: some View {
         NavigationStack {
-            ZStack(alignment: .bottomTrailing) {
+            VStack(spacing: 0) {
                 
-                ScrollView(showsIndicators: false) {
-                    VStack(alignment: .leading, spacing: 20) {
-                        
-                        Text("Buscar")
-                            .font(.largeTitle)
-                            .fontWeight(.bold)
-                            .padding(.horizontal, 20)
-                            .padding(.top, 10)
-                        
-                        searchBarSection
-                        
-                        filterChipsSection
-                        
-                        // 👇 NUEVO: Tarjeta Integrada de Filtros Avanzados
-                        if showAdvancedFilters {
-                            advancedFiltersCard
-                                .transition(.move(edge: .top).combined(with: .opacity))
-                        }
-                        
-                        if viewModel.filteredRequests.isEmpty {
-                            emptyStateSection
-                        } else {
-                            Text("\(viewModel.filteredRequests.count) solicitudes encontradas")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                                .padding(.horizontal, 20)
-                            
-                            LazyVStack(spacing: 16) {
-                                ForEach(viewModel.filteredRequests) { request in
-                                    RequestCardView(request: request)
-                                }
-                            }
-                            .padding(.horizontal, 20)
-                        }
-                        
-                        Spacer().frame(height: 100)
+                // MARK: - Barra de Búsqueda y Filtros
+                VStack(spacing: 16) {
+                    // Search Bar
+                    HStack {
+                        Image(systemName: "magnifyingglass").foregroundColor(.secondary)
+                        TextField("Buscar por título, tecnología...", text: $viewModel.searchText)
+                            .autocapitalization(.none)
+                            .disableAutocorrection(true)
                     }
-                }
-                .scrollDismissesKeyboard(.immediately)
-                
-                floatingActionButton
-            }
-            .background(Color(UIColor.systemBackground).ignoresSafeArea())
-            .navigationBarHidden(true)
-            .fullScreenCover(isPresented: $showCreateRequest) {
-                CreateRequestView()
-            }
-        }
-    }
-    
-    // MARK: - Componentes de la Vista
-    
-    private var searchBarSection: some View {
-        HStack(spacing: 12) {
-            HStack {
-                Image(systemName: "magnifyingglass")
-                    .foregroundColor(.gray)
-                TextField("Buscar por titulo, descr...", text: $viewModel.searchText)
-                    .autocapitalization(.none)
-            }
-            .padding()
-            .background(Color(UIColor.secondarySystemBackground))
-            .cornerRadius(12)
-            
-            Button(action: {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                    showAdvancedFilters.toggle()
-                }
-            }) {
-                Image(systemName: "slider.horizontal.3")
-                    .font(.title3)
-                    .foregroundColor(showAdvancedFilters ? .white : Color("FixyPrimary"))
-                    .padding()
-                    .background(showAdvancedFilters ? Color("FixyPrimary") : Color("FixyPrimary").opacity(0.15))
+                    .padding(12)
+                    .background(Color(UIColor.secondarySystemBackground))
                     .cornerRadius(12)
-            }
-        }
-        .padding(.horizontal, 20)
-    }
-    
-    private var filterChipsSection: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 12) {
-                ForEach(viewModel.filters, id: \.self) { filter in
-                    Button(action: {
-                        withAnimation { viewModel.selectedFilter = filter }
-                    }) {
-                        HStack(spacing: 6) {
-                            if filter == "Todo" { Image(systemName: "square.grid.2x2") }
-                            else if filter == "Asesorias" { Image(systemName: "book.pages") }
-                            else { Image(systemName: "rocket") }
-                            
-                            Text(filter).fontWeight(.medium)
-                        }
-                        .font(.subheadline)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 10)
-                        .background(viewModel.selectedFilter == filter ? Color("FixyPrimary").opacity(0.15) : Color.clear)
-                        .foregroundColor(viewModel.selectedFilter == filter ? Color("FixyPrimary") : .primary)
-                        .overlay(RoundedRectangle(cornerRadius: 20).stroke(viewModel.selectedFilter == filter ? Color("FixyPrimary") : Color.gray.opacity(0.3), lineWidth: 1))
-                    }
-                }
-            }
-            .padding(.horizontal, 20)
-        }
-    }
-    
-    // 🌟 TARJETA DE FILTROS AVANZADOS IDÉNTICA A LA IMAGEN
-    private var advancedFiltersCard: some View {
-        VStack(alignment: .leading, spacing: 24) {
-            
-            HStack(alignment: .top, spacing: 20) {
-                // Columna 1: Compensación
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("COMPENSACION").font(.caption).fontWeight(.bold).foregroundColor(.secondary)
-                    radioButton(title: "Todos", isSelected: viewModel.compensationFilter == "Todos") { viewModel.compensationFilter = "Todos" }
-                    radioButton(title: "Con pago", isSelected: viewModel.compensationFilter == "Con pago") { viewModel.compensationFilter = "Con pago" }
-                    radioButton(title: "Voluntario", isSelected: viewModel.compensationFilter == "Voluntario") { viewModel.compensationFilter = "Voluntario" }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                
-                // Columna 2: Dificultad
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("DIFICULTAD").font(.caption).fontWeight(.bold).foregroundColor(.secondary)
-                    radioButton(title: "Todas", isSelected: viewModel.difficultyFilter == 0) { viewModel.difficultyFilter = 0 }
-                    ForEach(1...5, id: \.self) { level in
-                        radioButton(title: "Nivel \(level)", isSelected: viewModel.difficultyFilter == level) { viewModel.difficultyFilter = level }
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            
-            // Sección Tags
-            VStack(alignment: .leading, spacing: 12) {
-                Text("TAGS").font(.caption).fontWeight(.bold).foregroundColor(.secondary)
-                FlowLayout(spacing: 8) {
-                    ForEach(viewModel.availableTags, id: \.self) { tech in
-                        let isSelected = viewModel.selectedTagsFilter.contains(tech)
-                        Text(tech)
-                            .font(.subheadline)
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 8)
-                            .background(isSelected ? Color("FixyPrimary").opacity(0.15) : Color(UIColor.systemBackground))
-                            .foregroundColor(isSelected ? Color("FixyPrimary") : .primary)
-                            .overlay(RoundedRectangle(cornerRadius: 20).stroke(isSelected ? Color("FixyPrimary") : Color.gray.opacity(0.3), lineWidth: 1))
-                            .onTapGesture {
-                                withAnimation {
-                                    if isSelected { viewModel.selectedTagsFilter.remove(tech) }
-                                    else { viewModel.selectedTagsFilter.insert(tech) }
+                    .padding(.horizontal)
+                    
+                    // Píldoras de Filtro
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 10) {
+                            ForEach(filters, id: \.self) { filter in
+                                Button(action: {
+                                    withAnimation { viewModel.selectedFilter = filter }
+                                }) {
+                                    Text(filter)
+                                        .font(.subheadline)
+                                        .fontWeight(.medium)
+                                        .padding(.horizontal, 16)
+                                        .padding(.vertical, 8)
+                                        .background(viewModel.selectedFilter == filter ? Color("FixyPrimary") : Color(UIColor.secondarySystemBackground))
+                                        .foregroundColor(viewModel.selectedFilter == filter ? .white : .primary)
+                                        .clipShape(Capsule())
                                 }
                             }
+                        }
+                        .padding(.horizontal)
+                    }
+                    .padding(.bottom, 10)
+                }
+                .padding(.top, 10)
+                
+                // MARK: - Lista de Resultados Dinámica
+                if viewModel.isLoading {
+                    Spacer()
+                    ProgressView("Buscando solicitudes...")
+                    Spacer()
+                } else if viewModel.filteredRequests.isEmpty {
+                    Spacer()
+                    VStack(spacing: 12) {
+                        Image(systemName: "doc.text.magnifyingglass").font(.system(size: 40)).foregroundColor(.gray)
+                        Text("No se encontraron solicitudes abiertas.").foregroundColor(.secondary)
+                    }
+                    Spacer()
+                } else {
+                    ScrollView {
+                        LazyVStack(spacing: 16) {
+                            ForEach(viewModel.filteredRequests) { request in
+                                // 🌟 AQUÍ ESTÁ LA MAGIA DE LA NAVEGACIÓN
+                                NavigationLink(destination: RequestDetailView(requestId: request.id)) {
+                                    requestCard(request)
+                                }
+                                .buttonStyle(PlainButtonStyle()) // Evita que la tarjeta se vuelva azul al tocarla
+                            }
+                        }
+                        .padding()
+                        .padding(.bottom, 80) // Espacio para que el TabBar no tape la última tarjeta
                     }
                 }
             }
-        }
-        .padding(20)
-        .background(Color(UIColor.secondarySystemBackground)) // Fondo gris redondeado
-        .cornerRadius(20)
-        .padding(.horizontal, 20)
-    }
-    
-    // Componente auxiliar para los Radio Buttons
-    private func radioButton(title: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: {
-            withAnimation { action() }
-        }) {
-            HStack(spacing: 12) {
-                Image(systemName: isSelected ? "largecircle.fill.circle" : "circle")
-                    .foregroundColor(isSelected ? Color("FixyPrimary") : .gray)
-                    .font(.system(size: 18))
-                Text(title)
-                    .font(.subheadline)
-                    .foregroundColor(.primary)
+            .navigationTitle("Buscar")
+            .navigationBarTitleDisplayMode(.large)
+            .background(Color(UIColor.systemBackground).ignoresSafeArea())
+            .task {
+                // Descarga los datos cuando la pantalla aparece
+                await viewModel.fetchRequests()
             }
         }
     }
     
-    private var emptyStateSection: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "doc.text.magnifyingglass")
-                .font(.system(size: 60))
-                .foregroundColor(Color.gray.opacity(0.5))
-            Text("No encontramos resultados")
-                .font(.title3)
-                .fontWeight(.bold)
-            Text("Intenta usar otras palabras clave o cambia los filtros de categoría.")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 40)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.top, 40)
-    }
-    
-    private var floatingActionButton: some View {
-        Button(action: {
-            showCreateRequest = true
-        }) {
-            Image(systemName: "plus")
-                .font(.system(size: 24, weight: .semibold))
-                .foregroundColor(Color("FixyPrimary"))
-                .padding(18)
-                .background(Color("FixyPrimary").opacity(0.2))
-                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 4)
-        }
-        .padding(.trailing, 20)
-        .padding(.bottom, 24)
-    }
-}
-
-// Mantenemos RequestCardView exactamente igual
-struct RequestCardView: View {
-    let request: FixyRequest
-    var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+    // MARK: - Diseño de la Tarjeta (Card)
+    private func requestCard(_ request: SearchRequestDTO) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // Fila 1: Tipo y Puntos
             HStack {
-                Text(request.type).font(.caption).fontWeight(.bold).padding(.horizontal, 12).padding(.vertical, 6).background(Color.teal.opacity(0.2)).foregroundColor(.teal).clipShape(Capsule())
-                Spacer()
-                Text("+\(request.points) pts").font(.subheadline).fontWeight(.bold).foregroundColor(.teal)
-            }
-            Text(request.title).font(.title3).fontWeight(.semibold).foregroundColor(.primary)
-            FlowLayout(spacing: 8) {
-                ForEach(request.technologies, id: \.self) { tech in
-                    Text(tech).font(.caption).foregroundColor(.primary).padding(.horizontal, 10).padding(.vertical, 5).overlay(Capsule().stroke(Color.gray.opacity(0.3), lineWidth: 1))
-                }
-            }
-            HStack(spacing: 8) {
-                Image(request.creatorAvatar).resizable().scaledToFit().frame(width: 24, height: 24).clipShape(Circle()).background(Circle().fill(Color.gray.opacity(0.2)))
-                Text(request.creatorName).font(.subheadline).fontWeight(.bold)
+                // 🚀 Aquí reemplazamos el "rocket" por "lightbulb.fill" para proyectos y "doc.text.fill" para asesorías
+                let isAsesoria = request.type.lowercased() == "asesoria"
                 HStack(spacing: 4) {
-                    Image(systemName: "hexagon").font(.system(size: 10))
-                    Text(request.creatorMedal)
+                    Image(systemName: isAsesoria ? "doc.text.fill" : "lightbulb.fill")
+                    Text(request.type.capitalized)
                 }
-                .font(.caption).foregroundColor(.gray).padding(.horizontal, 8).padding(.vertical, 4).background(Color.gray.opacity(0.15)).clipShape(Capsule())
-                if let price = request.price {
-                    Text("· S/ \(String(format: "%.2f", price))").font(.subheadline).fontWeight(.bold).foregroundColor(.teal)
+                .font(.caption).fontWeight(.bold)
+                .padding(.horizontal, 10).padding(.vertical, 5)
+                .background(isAsesoria ? Color.teal.opacity(0.15) : Color.indigo.opacity(0.15))
+                .foregroundColor(isAsesoria ? .teal : .indigo)
+                .clipShape(Capsule())
+                
+                Spacer()
+                
+                HStack(spacing: 4) {
+                    Image(systemName: "bolt.fill").foregroundColor(.yellow)
+                    Text("+\(request.points_reward) pts").fontWeight(.bold)
                 }
             }
-            .padding(.top, 4)
-            Text("\(request.expiration) · \(request.applicants) postulantes").font(.caption).foregroundColor(.secondary)
+            
+            // Fila 2: Título
+            Text(request.title)
+                .font(.headline)
+                .lineLimit(2)
+                .multilineTextAlignment(.leading)
+            
+            // Fila 3: Tecnologías (Mostramos máximo 3 para no saturar la tarjeta)
+            HStack(spacing: 8) {
+                ForEach(request.technologies.prefix(3), id: \.self) { tech in
+                    Text(tech)
+                        .font(.caption2)
+                        .padding(.horizontal, 8).padding(.vertical, 4)
+                        .background(Color(UIColor.tertiarySystemBackground))
+                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.gray.opacity(0.2), lineWidth: 1))
+                }
+                if request.technologies.count > 3 {
+                    Text("+\(request.technologies.count - 3)")
+                        .font(.caption2).foregroundColor(.secondary)
+                }
+            }
+            
+            Divider()
+            
+            // Fila 4: Creador y Dificultad
+            HStack {
+                HStack(spacing: 6) {
+                    Image(systemName: "person.circle.fill").foregroundColor(.secondary)
+                    Text(request.profiles?.full_name ?? "Usuario").font(.subheadline).foregroundColor(.secondary)
+                }
+                Spacer()
+                Text("Dificultad \(request.difficulty)/5").font(.caption).foregroundColor(.secondary)
+            }
         }
-        .padding(16)
+        .padding()
         .background(Color(UIColor.secondarySystemBackground))
         .cornerRadius(16)
     }
