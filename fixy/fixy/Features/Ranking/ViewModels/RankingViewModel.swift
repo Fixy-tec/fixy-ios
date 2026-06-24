@@ -6,81 +6,85 @@
 //
 
 import Foundation
+import Supabase
 import SwiftUI
 
 @Observable
 @MainActor
 final class RankingViewModel {
+    var allStudents: [RankingUserDTO] = []
+    var isLoading: Bool = true
     
-    // Filtro seleccionado para el carrusel de estudiantes
+    var currentUser: RankingUserDTO?
+    var currentUserPosition: Int = 0
+    
+    // 🌟 1. Cambiamos el filtro inicial a "Todos"
     var selectedFilter: String = "Todos"
     
-    // 1. Catálogo oficial de Medallas (Asegúrate de que los nombres de imagen coincidan con tus assets)
-    let allMedals: [FixyMedal] = [
-        FixyMedal(name: "Hierro", minPoints: 0, maxPoints: 299, imageName: "hierro"),
-        FixyMedal(name: "Bronce", minPoints: 300, maxPoints: 799, imageName: "bronce"),
-        FixyMedal(name: "Plata", minPoints: 800, maxPoints: 1799, imageName: "plata"),
-        FixyMedal(name: "Oro", minPoints: 1800, maxPoints: 3499, imageName: "oro"),
-        FixyMedal(name: "Diamante", minPoints: 3500, maxPoints: 5999, imageName: "diamante"),
-        FixyMedal(name: "Maestro", minPoints: 6000, maxPoints: 9999, imageName: "maestro"),
-        FixyMedal(name: "Challenger", minPoints: 10000, maxPoints: 99999, imageName: "challenger")
+    let allTiers: [MedalTier] = [
+        MedalTier(name: "Hierro", minPoints: 0, maxPoints: 499),
+        MedalTier(name: "Bronce", minPoints: 500, maxPoints: 999),
+        MedalTier(name: "Plata", minPoints: 1000, maxPoints: 1999),
+        MedalTier(name: "Oro", minPoints: 2000, maxPoints: 3499),
+        MedalTier(name: "Diamante", minPoints: 3500, maxPoints: 5999),
+        MedalTier(name: "Maestro", minPoints: 6000, maxPoints: 9999),
+        MedalTier(name: "Challenger", minPoints: 10000, maxPoints: nil)
     ]
     
-    // 2. Datos del usuario actual simulados
-    let currentUserPoints = 4320
-    let currentUserPosition = 2
-    
-    // Calculamos qué medalla tiene el usuario actualmente basado en sus puntos
-    var currentMedal: FixyMedal {
-        allMedals.first { currentUserPoints >= $0.minPoints && currentUserPoints <= $0.maxPoints } ?? allMedals[0]
-    }
-    
-    // Calculamos cuál es la siguiente medalla
-    var nextMedal: FixyMedal? {
-        if let currentIndex = allMedals.firstIndex(where: { $0.id == currentMedal.id }), currentIndex + 1 < allMedals.count {
-            return allMedals[currentIndex + 1]
+    func fetchRanking() async {
+        self.isLoading = true
+        guard let myId = SupabaseManager.shared.client.auth.currentUser?.id else { return }
+        
+        do {
+            let fetched: [RankingUserDTO] = try await SupabaseManager.shared.client
+                .from("profiles")
+                .select("id, full_name, total_points, medal")
+                .order("total_points", ascending: false)
+                .execute()
+                .value
+            
+            self.allStudents = fetched
+            
+            if let index = fetched.firstIndex(where: { $0.id == myId }) {
+                self.currentUser = fetched[index]
+                self.currentUserPosition = index + 1
+            }
+        } catch {
+            print("Error cargando ranking: \(error)")
         }
-        return nil
+        self.isLoading = false
     }
     
-    // Porcentaje de la barra de progreso (0.0 a 1.0)
-    var progressPercentage: Double {
-        guard let next = nextMedal else { return 1.0 } // Si ya es Challenger, barra llena
-        let range = Double(next.minPoints - currentMedal.minPoints)
-        let currentProgress = Double(currentUserPoints - currentMedal.minPoints)
-        return currentProgress / range
-    }
-    
-    // 3. Base de datos simulada del Top Estudiantes
-    private var allStudents: [RankedStudent] = []
-    
-    init() {
-        // Inicializamos los estudiantes (Usamos las medallas del catálogo)
-        allStudents = [
-            RankedStudent(position: 1, fullName: "Ana Castillo", points: 8240, medal: allMedals[5], isCurrentUser: false),
-            RankedStudent(position: 2, fullName: "Yordan Sapacayo", points: 4320, medal: allMedals[4], isCurrentUser: true),
-            RankedStudent(position: 3, fullName: "Marco Villanueva", points: 3890, medal: allMedals[4], isCurrentUser: false),
-            RankedStudent(position: 4, fullName: "Sofia Rios", points: 2100, medal: allMedals[3], isCurrentUser: false)
-        ]
-    }
-    
-    // 4. Lógica de filtrado en tiempo real
-    var filteredStudents: [RankedStudent] {
+    // 🌟 2. Lógica actualizada para aceptar "Todos"
+    var filteredStudents: [RankingUserDTO] {
         if selectedFilter == "Todos" {
-            return allStudents.sorted { $0.position < $1.position }
-        } else {
             return allStudents
-                .filter { $0.medal.name == selectedFilter }
-                .sorted { $0.position < $1.position }
         }
+        return allStudents.filter { ($0.medal ?? "Hierro").lowercased() == selectedFilter.lowercased() }
     }
     
-    // Opciones para el filtro horizontal de estudiantes
-    var studentFilters: [String] {
-        var filters = ["Todos"]
-        // Solo mostramos filtros de medallas que realmente tengan estudiantes
-        let activeMedals = Set(allStudents.map { $0.medal.name })
-        filters.append(contentsOf: allMedals.map { $0.name }.filter { activeMedals.contains($0) })
-        return filters
+    // MARK: - Cálculos de Progreso (Para el Banner Superior)
+    
+    var currentTier: MedalTier? {
+        let pts = currentUser?.total_points ?? 0
+        return allTiers.first { pts >= $0.minPoints && (pts <= ($0.maxPoints ?? Int.max)) }
+    }
+    
+    var nextTier: MedalTier? {
+        guard let current = currentTier, let index = allTiers.firstIndex(of: current) else { return nil }
+        return index + 1 < allTiers.count ? allTiers[index + 1] : nil
+    }
+    
+    var progressPercentage: Double {
+        guard let current = currentTier, let max = current.maxPoints else { return 1.0 }
+        let pts = Double(currentUser?.total_points ?? 0)
+        let min = Double(current.minPoints)
+        let range = Double(max) - min
+        return max > 0 ? (pts - min) / range : 1.0
+    }
+    
+    var pointsToNextRank: Int {
+        guard let next = nextTier else { return 0 }
+        return next.minPoints - (currentUser?.total_points ?? 0)
     }
 }

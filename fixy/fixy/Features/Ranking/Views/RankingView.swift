@@ -6,328 +6,267 @@
 //
 
 import SwiftUI
+import Supabase
 
 struct RankingView: View {
     @State private var viewModel = RankingViewModel()
     
+    // Animación de flotabilidad (Banner)
+    @State private var isAnimatingMedals = false
+    // 🌟 Animación de toque (Carrusel)
+    @State private var tappedMedal: String? = nil
+    
+    // 🌟 Lista de filtros completa y en orden
+    let rankFilters = ["Todos", "Challenger", "Maestro", "Diamante", "Oro", "Plata", "Bronce", "Hierro"]
+    
     var body: some View {
         NavigationStack {
-            ScrollView(showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 30) {
-                    
-                    Text("Ranking")
-                        .font(.largeTitle)
-                        .fontWeight(.bold)
-                        .padding(.horizontal, 20)
+            Group {
+                if viewModel.isLoading {
+                    ProgressView("Calculando ranking...")
+                } else {
+                    ScrollView(showsIndicators: false) {
+                        VStack(spacing: 24) {
+                            currentRankBanner
+                            medalsCarousel
+                            topStudentsSection
+                        }
                         .padding(.top, 10)
-                    
-                    // 1. Tarjeta Principal del Rango Actual
-                    currentRankCard
-                        .padding(.horizontal, 20)
-                    
-                    // 2. Carrusel de Todas las Medallas
-                    allMedalsSection
-                    
-                    // 3. Top Estudiantes con Filtros
-                    topStudentsSection
-                    
-                    Spacer().frame(height: 100) // Espacio para el TabBar inferior
+                        .padding(.bottom, 100)
+                    }
                 }
             }
-            .background(Color(UIColor.systemBackground).ignoresSafeArea())
+            .navigationTitle("Ranking")
+            .navigationBarTitleDisplayMode(.large)
+            .background(Color(UIColor.secondarySystemBackground).ignoresSafeArea())
+            .task { await viewModel.fetchRanking() }
+            .onAppear {
+                withAnimation(.easeInOut(duration: 1.8).repeatForever(autoreverses: true)) {
+                    isAnimatingMedals = true
+                }
+            }
         }
     }
     
-    // MARK: - Tarjeta Principal
-    private var currentRankCard: some View {
+    // MARK: - 1. Tarjeta de Rango Actual (Banner Superior)
+    private var currentRankBanner: some View {
         VStack(spacing: 20) {
             HStack(spacing: 20) {
-                // Círculo de progreso con la medalla
                 ZStack {
-                    Circle()
-                        .stroke(Color.gray.opacity(0.2), lineWidth: 6)
-                        .frame(width: 80, height: 80)
-                    
+                    Circle().stroke(Color.gray.opacity(0.2), lineWidth: 8)
                     Circle()
                         .trim(from: 0, to: viewModel.progressPercentage)
-                        .stroke(Color("FixyPrimary"), style: StrokeStyle(lineWidth: 6, lineCap: .round))
-                        .frame(width: 80, height: 80)
+                        .stroke(Color("FixyPrimary"), style: StrokeStyle(lineWidth: 8, lineCap: .round))
                         .rotationEffect(.degrees(-90))
                     
-                    Image(viewModel.currentMedal.imageName)
+                    Image((viewModel.currentUser?.medal ?? "diamante").lowercased())
                         .resizable()
                         .scaledToFit()
                         .frame(width: 50, height: 50)
+                        .shadow(color: Color("FixyPrimary").opacity(isAnimatingMedals ? 0.6 : 0.2), radius: isAnimatingMedals ? 10 : 4)
+                        .offset(y: isAnimatingMedals ? -3 : 3)
                 }
+                .frame(width: 90, height: 90)
                 
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("TU RANGO ACTUAL")
-                        .font(.caption)
-                        .fontWeight(.bold)
-                        .foregroundColor(.secondary)
-                    
-                    Text(viewModel.currentMedal.name)
-                        .font(.title)
-                        .fontWeight(.bold)
-                        .foregroundColor(.primary)
-                    
+                    Text("TU RANGO ACTUAL").font(.caption).fontWeight(.bold).foregroundColor(.secondary)
+                    Text(viewModel.currentTier?.name ?? "Rango").font(.title).fontWeight(.bold)
                     HStack(spacing: 12) {
-                        statPill(value: "\(viewModel.currentUserPoints)", label: "Tus puntos")
-                        statPill(value: "#\(viewModel.currentUserPosition)", label: "Posicion")
+                        VStack {
+                            Text("\(viewModel.currentUser?.total_points ?? 0)").font(.headline).fontWeight(.bold)
+                            Text("Tus puntos").font(.caption2).foregroundColor(.secondary)
+                        }
+                        .padding(.horizontal, 12).padding(.vertical, 8)
+                        .background(Color(UIColor.tertiarySystemBackground)).cornerRadius(10)
+                        
+                        VStack {
+                            Text("#\(viewModel.currentUserPosition)").font(.headline).fontWeight(.bold)
+                            Text("Posicion").font(.caption2).foregroundColor(.secondary)
+                        }
+                        .padding(.horizontal, 12).padding(.vertical, 8)
+                        .background(Color(UIColor.tertiarySystemBackground)).cornerRadius(10)
                     }
                 }
                 Spacer()
             }
             
-            // Barra de progreso lineal
             VStack(spacing: 8) {
                 GeometryReader { geometry in
                     ZStack(alignment: .leading) {
-                        Capsule()
-                            .fill(Color.gray.opacity(0.2))
-                            .frame(height: 8)
-                        
-                        Capsule()
-                            .fill(Color("FixyPrimary"))
-                            .frame(width: geometry.size.width * viewModel.progressPercentage, height: 8)
+                        RoundedRectangle(cornerRadius: 4).fill(Color(UIColor.tertiarySystemBackground)).frame(height: 8)
+                        RoundedRectangle(cornerRadius: 4).fill(Color("FixyPrimary"))
+                            .frame(width: max(0, geometry.size.width * viewModel.progressPercentage), height: 8)
                     }
                 }
                 .frame(height: 8)
                 
                 HStack {
-                    Text("\(viewModel.currentMedal.minPoints) pts")
+                    Text("\(viewModel.currentTier?.minPoints ?? 0) pts")
                     Spacer()
-                    if let next = viewModel.nextMedal {
+                    if let next = viewModel.nextTier {
+                        Text("\(viewModel.pointsToNextRank) pts para \(next.name)").foregroundColor(.secondary)
+                        Spacer()
                         Text("\(next.minPoints) pts")
+                    } else {
+                        Text("Rango Máximo").foregroundColor(.secondary)
+                        Spacer()
                     }
                 }
                 .font(.caption)
-                .foregroundColor(.secondary)
-                
-                if let next = viewModel.nextMedal {
-                    let needed = next.minPoints - viewModel.currentUserPoints
-                    Text("\(needed) pts para \(next.name)")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                        .padding(.top, 4)
-                }
             }
         }
-        .padding(20)
-        .background(Color(UIColor.secondarySystemBackground))
-        .cornerRadius(20)
+        .padding(20).background(Color(UIColor.systemBackground)).cornerRadius(24).padding(.horizontal)
     }
     
-    private func statPill(value: String, label: String) -> some View {
-        VStack(spacing: 2) {
-            Text(value).font(.headline).fontWeight(.bold)
-            Text(label).font(.caption2).foregroundColor(.secondary)
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(Color(UIColor.systemBackground))
-        .cornerRadius(10)
-    }
-    
-    // MARK: - Carrusel de Medallas
-    private var allMedalsSection: some View {
+    // MARK: - 2. Carrusel de Todas las Medallas
+    private var medalsCarousel: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
                 Image(systemName: "star")
-                Text("TODAS LAS MEDALLAS")
+                Text("TODAS LAS MEDALLAS").font(.caption).fontWeight(.bold).tracking(1)
             }
-            .font(.caption)
-            .fontWeight(.bold)
             .foregroundColor(.secondary)
-            .padding(.horizontal, 20)
+            .padding(.horizontal)
             
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 16) {
-                    ForEach(viewModel.allMedals) { medal in
-                        // Usamos un componente separado para manejar la animación individualmente
-                        AnimatedMedalCard(
-                            medal: medal,
-                            isCurrent: medal.id == viewModel.currentMedal.id
+                HStack(spacing: 12) { // 🌟 Reducimos el espaciado
+                    ForEach(viewModel.allTiers, id: \.name) { tier in
+                        let isCurrentTier = viewModel.currentTier?.name == tier.name
+                        let isTapped = tappedMedal == tier.name
+                        
+                        VStack(spacing: 10) {
+                            if isCurrentTier {
+                                Text("Tu aqui")
+                                    .font(.system(size: 10, weight: .bold)) // Letra más pequeña
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 8).padding(.vertical, 4)
+                                    .background(Color("FixyPrimary"))
+                                    .clipShape(Capsule())
+                            } else {
+                                Spacer().frame(height: 20)
+                            }
+                            
+                            Image(tier.name.lowercased())
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 45, height: 45) // 🌟 Imagen un poco más chica
+                                // 🌟 EFECTO DE ANIMACIÓN: Sombreado dinámico y giro de lado a lado
+                                .shadow(color: isTapped ? Color("FixyPrimary").opacity(0.8) : Color.clear, radius: isTapped ? 15 : 0)
+                                .rotationEffect(.degrees(isTapped ? 15 : 0))
+                                .animation(.spring(response: 0.2, dampingFraction: 0.2), value: isTapped)
+                            
+                            VStack(spacing: 2) {
+                                Text(tier.name).font(.subheadline).fontWeight(.bold)
+                                Text(tier.rangeText).font(.caption2).foregroundColor(.secondary)
+                            }
+                        }
+                        .padding(.vertical, 14)
+                        .frame(width: 105) // 🌟 Reducimos el ancho de las tarjetas
+                        .background(Color(UIColor.systemBackground))
+                        .cornerRadius(18)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 18)
+                                .stroke(isCurrentTier ? Color("FixyPrimary") : Color.gray.opacity(0.3), lineWidth: isCurrentTier ? 2 : 1)
                         )
+                        // 🌟 GESTO DE TOQUE
+                        .onTapGesture {
+                            tappedMedal = tier.name
+                            // Vuelve a su estado original después de un instante para dar sensación de "rebote"
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                tappedMedal = nil
+                            }
+                        }
                     }
                 }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 10) // Espacio para que la sombra de la animación no se corte
+                .padding(.horizontal)
+                .padding(.bottom, 10)
             }
         }
     }
     
-    // MARK: - Top Estudiantes
+    // MARK: - 3. Top Estudiantes
     private var topStudentsSection: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
                 Image(systemName: "person.2")
-                Text("TOP ESTUDIANTES")
+                Text("TOP ESTUDIANTES").font(.caption).fontWeight(.bold).tracking(1)
             }
-            .font(.caption)
-            .fontWeight(.bold)
             .foregroundColor(.secondary)
-            .padding(.horizontal, 20)
+            .padding(.horizontal)
             
-            // Filtros horizontales
+            // 🌟 Píldoras de filtrado actualizadas
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 12) {
-                    ForEach(viewModel.studentFilters, id: \.self) { filter in
-                        Button(action: {
-                            withAnimation { viewModel.selectedFilter = filter }
-                        }) {
-                            HStack {
-                                if let matchedMedal = viewModel.allMedals.first(where: { $0.name == filter }) {
-                                    Image(matchedMedal.imageName)
-                                        .resizable()
-                                        .scaledToFit()
-                                        .frame(width: 16, height: 16)
+                HStack(spacing: 10) {
+                    ForEach(rankFilters, id: \.self) { rank in
+                        Button(action: { withAnimation { viewModel.selectedFilter = rank } }) {
+                            HStack(spacing: 6) {
+                                if rank == "Todos" {
+                                    Image(systemName: "person.3.fill").font(.caption)
+                                } else {
+                                    Image(rank.lowercased()).resizable().frame(width: 16, height: 16)
                                 }
-                                Text(filter)
+                                Text(rank)
                             }
-                            .font(.subheadline)
-                            .fontWeight(.medium)
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 10)
-                            .background(viewModel.selectedFilter == filter ? Color("FixyPrimary").opacity(0.15) : Color.clear)
-                            .foregroundColor(viewModel.selectedFilter == filter ? Color("FixyPrimary") : .primary)
-                            .overlay(RoundedRectangle(cornerRadius: 20).stroke(viewModel.selectedFilter == filter ? Color("FixyPrimary") : Color.gray.opacity(0.3), lineWidth: 1))
+                            .font(.subheadline).fontWeight(.medium)
+                            .padding(.horizontal, 16).padding(.vertical, 10)
+                            .background(viewModel.selectedFilter == rank ? Color(UIColor.systemBackground) : Color.clear)
+                            .foregroundColor(viewModel.selectedFilter == rank ? .primary : .secondary)
+                            .clipShape(Capsule())
+                            .overlay(Capsule().stroke(viewModel.selectedFilter == rank ? Color.clear : Color.gray.opacity(0.3), lineWidth: 1))
+                            .shadow(color: Color.black.opacity(viewModel.selectedFilter == rank ? 0.05 : 0), radius: 5, y: 2)
                         }
                     }
                 }
-                .padding(.horizontal, 20)
+                .padding(.horizontal)
+                .padding(.bottom, 4)
             }
             
-            // Lista de Estudiantes
             LazyVStack(spacing: 12) {
-                ForEach(viewModel.filteredStudents) { student in
-                    studentRow(student)
+                ForEach(Array(viewModel.filteredStudents.enumerated()), id: \.element.id) { index, student in
+                    let isMe = SupabaseManager.shared.client.auth.currentUser?.id == student.id
+                    studentRow(position: index + 1, student: student, isMe: isMe)
                 }
             }
-            .padding(.horizontal, 20)
-            .padding(.top, 8)
+            .padding(.horizontal)
         }
     }
     
-    private func studentRow(_ student: RankedStudent) -> some View {
-        HStack(spacing: 16) {
-            // Número o Ícono
-            Group {
-                if student.position == 1 {
-                    Image(systemName: "medal.fill").foregroundColor(.yellow)
-                } else if student.position == 2 {
-                    Image(systemName: "medal.fill").foregroundColor(.gray)
-                } else if student.position == 3 {
-                    Image(systemName: "medal.fill").foregroundColor(.orange)
-                } else {
-                    Text("\(student.position)").fontWeight(.bold).foregroundColor(.secondary)
-                }
-            }
-            .font(.title3)
-            .frame(width: 30)
+    private func studentRow(position: Int, student: RankingUserDTO, isMe: Bool) -> some View {
+        HStack(spacing: 14) {
+            Image(systemName: "medal.fill")
+                .foregroundColor(position == 1 ? .yellow : position == 2 ? .gray : position == 3 ? .brown : .secondary.opacity(0.5))
+                .font(.title3)
+                .frame(width: 30)
             
-            // Iniciales
-            Text(student.initials)
-                .font(.subheadline)
-                .fontWeight(.bold)
-                .foregroundColor(student.isCurrentUser ? Color("FixyPrimary") : .primary)
+            let nameStr = student.full_name ?? "Estudiante"
+            Text(String(nameStr.prefix(2)).uppercased())
+                .font(.caption).fontWeight(.bold)
+                .foregroundColor(Color("FixyPrimary"))
                 .frame(width: 40, height: 40)
-                .background(student.isCurrentUser ? Color("FixyPrimary").opacity(0.2) : Color.blue.opacity(0.1))
+                .background(Color("FixyPrimary").opacity(0.15))
                 .clipShape(Circle())
             
-            // Nombre y Puntos
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
-                    Text(student.fullName)
-                        .font(.headline)
-                    if student.isCurrentUser {
-                        Text("(tu)")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
+                    Text(nameStr).font(.subheadline).fontWeight(.bold)
+                    if isMe {
+                        Text("(tú)").font(.subheadline).fontWeight(.bold).foregroundColor(.primary)
                     }
                 }
-                Text("\(student.points) pts")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                Text("\(student.total_points ?? 0) pts").font(.caption).foregroundColor(.secondary)
             }
             
             Spacer()
             
-            // Medalla en pequeño
-            Image(student.medal.imageName)
+            Image((student.medal ?? "Hierro").lowercased())
                 .resizable()
                 .scaledToFit()
-                .frame(width: 30, height: 30)
+                .frame(width: 28, height: 28)
         }
-        .padding()
-        .background(student.isCurrentUser ? Color("FixyPrimary").opacity(0.1) : Color(UIColor.secondarySystemBackground))
-        .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(student.isCurrentUser ? Color("FixyPrimary") : Color.clear, lineWidth: 2)
-        )
-        .cornerRadius(16)
-    }
-}
-
-// MARK: - Subvista con Animación (El secreto de la magia al tocar)
-struct AnimatedMedalCard: View {
-    let medal: FixyMedal
-    let isCurrent: Bool
-    
-    // Estado local para la animación de esta tarjeta específica
-    @State private var isWiggling = false
-    
-    var body: some View {
-        VStack(spacing: 8) {
-            if isCurrent {
-                Text("Tu aqui")
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(Color("FixyPrimary"))
-                    .clipShape(Capsule())
-                    .offset(y: -5)
-            } else {
-                Spacer().frame(height: 18) // Mantener la misma altura para alinear
-            }
-            
-            Image(medal.imageName)
-                .resizable()
-                .scaledToFit()
-                .frame(width: 50, height: 50)
-            
-            Text(medal.name)
-                .font(.subheadline)
-                .fontWeight(.bold)
-            
-            Text(medal.maxPoints == 99999 ? "\(medal.minPoints)+" : "\(medal.minPoints)-\(medal.maxPoints)")
-                .font(.caption2)
-                .foregroundColor(.secondary)
-        }
-        .frame(width: 100, height: 140)
-        .background(Color(UIColor.secondarySystemBackground))
-        .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(isCurrent ? Color("FixyPrimary") : Color.clear, lineWidth: 2)
-        )
-        .cornerRadius(16)
-        // 🌟 LA ANIMACIÓN EXACTA QUE PEDISTE
-        .rotationEffect(.degrees(isWiggling ? 3 : 0)) // Tiembla un poco
-        .scaleEffect(isWiggling ? 1.05 : 1.0) // Se hace ligeramente más grande
-        .shadow(color: isWiggling ? Color.black.opacity(0.15) : Color.clear, radius: 8, x: 0, y: 5) // Sombra de "despegue"
-        .onTapGesture {
-            // Dispara el temblor con un resorte
-            withAnimation(.spring(response: 0.2, dampingFraction: 0.2, blendDuration: 0)) {
-                isWiggling = true
-            }
-            // Lo devuelve a la normalidad después de un instante
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                withAnimation(.easeOut(duration: 0.2)) {
-                    isWiggling = false
-                }
-            }
-        }
+        .padding(16)
+        .background(Color(UIColor.systemBackground))
+        .cornerRadius(20)
+        .overlay(RoundedRectangle(cornerRadius: 20).stroke(isMe ? Color("FixyPrimary") : Color.clear, lineWidth: 2))
     }
 }
 

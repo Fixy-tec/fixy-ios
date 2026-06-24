@@ -15,11 +15,20 @@ final class CreateRequestViewModel {
     var isLoading: Bool = false
     var errorMessage: String? = nil
     
+    // MARK: - Variables de Tags
+    // 1. Llamamos a todos los tags disponibles desde nuestra constante global
+    var availableTags: [String] {
+        return AppConstants.tags
+    }
+    
+    // 2. Aquí guardamos los que el usuario va seleccionando en la vista
+    var selectedTags: Set<String> = []
+    
+    // MARK: - Funciones
     func createRequest(
         type: String,
         title: String,
         description: String,
-        tags: Set<String>,
         difficulty: Int,
         deadline: Date,
         priceString: String
@@ -42,10 +51,10 @@ final class CreateRequestViewModel {
         }
         
         // 3. Formatear los datos
-        let tagsArray = Array(tags)
+        let tagsArray = Array(self.selectedTags) // 👈 Leemos los tags directamente de la variable de arriba
         let calculatedPoints = difficulty * 60
         
-        // Convertir el precio de String a Double de forma segura (si está vacío, se envía nil)
+        // Convertir el precio de String a Double de forma segura
         let formattedPrice: Double? = {
             let cleanString = priceString.replacingOccurrences(of: ",", with: ".")
             return cleanString.isEmpty ? nil : Double(cleanString)

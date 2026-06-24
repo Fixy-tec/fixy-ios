@@ -7,30 +7,21 @@
 
 import Foundation
 
-struct FixyMedal: Identifiable, Hashable {
-    let id = UUID()
-    let name: String
-    let minPoints: Int
-    let maxPoints: Int
-    let imageName: String // Esto coincidirá con tus imágenes en Assets (ej. "diamante")
+struct RankingUserDTO: Decodable, Identifiable {
+    let id: UUID
+    let full_name: String?
+    let total_points: Int?
+    let medal: String?
 }
 
-struct RankedStudent: Identifiable {
-    let id = UUID()
-    let position: Int
-    let fullName: String
-    let points: Int
-    let medal: FixyMedal
-    let isCurrentUser: Bool
+// Estructura de soporte para nuestro sistema de medallas/rangos
+struct MedalTier: Hashable {
+    let name: String
+    let minPoints: Int
+    let maxPoints: Int? // nil para el rango máximo (Challenger)
     
-    // Extrae las iniciales automáticamente (ej. "Yordan Sapacayo" -> "YS")
-    var initials: String {
-        let parts = fullName.components(separatedBy: " ")
-        let first = parts.first?.prefix(1) ?? ""
-        
-        // CORRECCIÓN AQUÍ: Faltaba el ": """ al final de esta línea
-        let last = parts.count > 1 ? (parts.last?.prefix(1) ?? "") : ""
-        
-        return String(first + last).uppercased()
+    var rangeText: String {
+        if let max = maxPoints { return "\(minPoints)-\(max)" }
+        return "\(minPoints)+"
     }
 }
