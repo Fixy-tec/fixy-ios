@@ -12,43 +12,43 @@ import SwiftUI
 @Observable
 @MainActor
 final class SearchViewModel {
-    // Todos los datos crudos de Supabase
     var allRequests: [SearchRequestDTO] = []
     var isLoading: Bool = true
     
-    // Variables de filtrado para la Vista
+    // Variables reactivas en tiempo real
     var searchText: String = ""
-    var selectedFilter: String = "Todos" // Puede ser "Todos", "Asesoria", "Proyecto"
+    var selectedFilter: String = "Todos"
     
     func fetchRequests() async {
         self.isLoading = true
         do {
-            // Hacemos un JOIN con profiles para tener el nombre del creador
             let fetched: [SearchRequestDTO] = try await SupabaseManager.shared.client
                 .from("requests")
                 .select("*, profiles(full_name, medal)")
-                .eq("status", value: "abierta") // Solo mostramos las que se pueden postular
+                .eq("status", value: "abierta")
                 .order("created_at", ascending: false)
                 .execute()
                 .value
             
             self.allRequests = fetched
         } catch {
-            print("❌ Error al cargar las búsquedas: \(error)")
+            print("❌ Error al descargar búsquedas: \(error.localizedDescription)")
         }
         self.isLoading = false
     }
     
-    // Esta propiedad calculada devuelve la lista filtrada en tiempo real
+    // Propiedad calculada que filtra reactivamente en hilos del hilo principal
     var filteredRequests: [SearchRequestDTO] {
         var result = allRequests
         
-        // 1. Filtrar por Tipo (Píldoras superiores)
+        // 1. Filtrado por píldora de tipo
         if selectedFilter != "Todos" {
-            result = result.filter { $0.type.lowercased() == selectedFilter.lowercased() }
+            // Normalizamos para evitar problemas de mayúsculas/minúsculas de la base de datos
+            let filterClean = selectedFilter.lowercased() == "asesoria" ? "asesoria" : "proyecto"
+            result = result.filter { $0.type.lowercased() == filterClean }
         }
         
-        // 2. Filtrar por Texto (Barra de búsqueda)
+        // 2. Filtrado por texto ingresado en tiempo real
         if !searchText.isEmpty {
             result = result.filter { request in
                 request.title.localizedCaseInsensitiveContains(searchText) ||
