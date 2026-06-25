@@ -13,3 +13,5 @@ Core/Utils/Secrets.xcconfig
 
 # macOS
 .DS_Store
+
+Info.plist
