@@ -13,39 +13,31 @@ import Supabase
 @Observable
 @MainActor
 final class EditProfileViewModel {
-    // MARK: - Avatar
+    // MARK: - Variables de Estado
     var selectedAvatar: String = "cyborg"
     var customAvatarData: Data? = nil
     var selectedPhotoItem: PhotosPickerItem? = nil
     let predefinedAvatars = ["arte", "cyborg", "hacker", "karate", "money", "pirata"]
     
-    // MARK: - Datos Personales
     var fullName: String = ""
     var career: String = ""
-    var cycle: String = "" // Tu vista usa String para el TextField
-    
-    // MARK: - Bio y URLs
+    var cycle: String = ""
     var bio: String = ""
     var githubUrl: String = ""
     var linkedinUrl: String = ""
     var portfolioUrl: String = ""
     
-    // MARK: - Errores de Validación
     var nameError: String? = nil
     var careerError: String? = nil
     var cycleError: String? = nil
     var isLoading: Bool = false
     
-    // MARK: - Validación Reactiva
     var isFormValid: Bool {
-        let isNameValid = !fullName.trimmingCharacters(in: .whitespaces).isEmpty
-        let isCareerValid = !career.trimmingCharacters(in: .whitespaces).isEmpty
-        let isCycleValid = Int(cycle) != nil && (1...10).contains(Int(cycle)!)
-        
-        return isNameValid && isCareerValid && isCycleValid
+        !fullName.trimmingCharacters(in: .whitespaces).isEmpty &&
+        !career.trimmingCharacters(in: .whitespaces).isEmpty &&
+        Int(cycle) != nil
     }
     
-    // MARK: - Procesar Foto Personalizada
     func processSelectedPhoto() async {
         guard let item = selectedPhotoItem else { return }
         do {
@@ -54,57 +46,68 @@ final class EditProfileViewModel {
                 self.selectedAvatar = "custom"
             }
         } catch {
-            print("Error cargando la foto: \(error)")
+            print("Error cargando foto: \(error)")
         }
     }
     
-    // MARK: - Pre-llenar Formulario
     func loadCurrentData(user: ProfilePresentationModel) {
-        self.fullName = user.fullName == "Cargando..." ? "" : user.fullName
-        self.career = user.career == "Sin carrera asignada" ? "" : user.career
-        
-        let cleanedCycle = user.cycle.components(separatedBy: CharacterSet.decimalDigits.inverted).joined()
-        self.cycle = cleanedCycle.isEmpty ? "1" : cleanedCycle
-        
-        // Asumiendo que agregas bio y urls a tu ProfilePresentationModel luego
+        self.fullName = user.fullName
+        self.career = user.career
+        self.cycle = user.cycle.components(separatedBy: CharacterSet.decimalDigits.inverted).joined()
         self.selectedAvatar = user.avatarId ?? "cyborg"
     }
     
     // MARK: - Guardar en Supabase
-    func saveProfile() {
-        guard let userId = SupabaseManager.shared.client.auth.currentUser?.id else { return }
+    func saveProfile() async -> Bool {
         self.isLoading = true
-        
-        // Convertimos el ciclo a Int (es seguro por la validación isFormValid)
-        let cycleInt = Int(cycle) ?? 1
-        
-        let updateData = ProfileUpdateDTO(
-            full_name: fullName,
-            career: career,
-            cycle: cycleInt,
-            bio: bio,
-            github_url: githubUrl,
-            linkedin_url: linkedinUrl,
-            portfolio_url: portfolioUrl,
-            avatar_id: selectedAvatar
-        )
-        
-        Task {
-            do {
-                // NOTA: Si 'selectedAvatar' es "custom", idealmente aquí subirías 'customAvatarData'
-                // a un Storage Bucket de Supabase y guardarías la URL pública.
-                // Por ahora guardaremos la selección estática o la etiqueta "custom".
-                
-                try await SupabaseManager.shared.client
-                    .from("profiles")
-                    .update(updateData)
-                    .eq("id", value: userId)
-                    .execute()
-                
-            } catch {
-                print("❌ Error al guardar perfil: \(error)")
-            }
+        guard let userId = SupabaseManager.shared.client.auth.currentUser?.id else {
             self.isLoading = false
+            return false
+        }
+        
+        do {
+            var finalAvatarId = selectedAvatar
+            
+            if selectedAvatar == "custom", let imageData = customAvatarData {
+                let fileName = "\(userId)-\(UUID().uuidString).jpg"
+                
+                // 🌟 CORRECCIÓN 1: Nueva sintaxis de upload de Supabase
+                try await SupabaseManager.shared.client.storage
+                    .from("avatars")
+                    .upload(fileName, data: imageData, options: FileOptions(contentType: "image/jpeg"))
+                
+                // 🌟 CORRECCIÓN 2: getPublicURL ya no es asíncrono, se quita el 'await'
+                let urlResponse = try SupabaseManager.shared.client.storage
+                    .from("avatars")
+                    .getPublicURL(path: fileName)
+                
+                finalAvatarId = urlResponse.absoluteString
+            }
+            
+            let updateData = ProfileUpdateDTO(
+                full_name: fullName,
+                career: career,
+                cycle: Int(cycle) ?? 1,
+                bio: bio,
+                github_url: githubUrl,
+                linkedin_url: linkedinUrl,
+                portfolio_url: portfolioUrl,
+                avatar_id: finalAvatarId
+            )
+            
+            try await SupabaseManager.shared.client
+                .from("profiles")
+                .update(updateData)
+                .eq("id", value: userId)
+                .execute()
+            
+            self.isLoading = false
+            return true
+            
+        } catch {
+            print("Error al guardar: \(error)")
+            self.isLoading = false
+            return false
         }
     }
 }

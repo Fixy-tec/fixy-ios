@@ -15,7 +15,6 @@ struct ProfileView: View {
     @State private var showEditPhone = false
     @State private var showEditProfile = false
     @State private var showLogoutAlert = false
-    @State private var showEditAvatar = false
     
     var body: some View {
         NavigationStack {
@@ -32,16 +31,16 @@ struct ProfileView: View {
                             Image(systemName: "pencil").font(.title2).foregroundColor(.primary)
                         }
                         Button(action: { showLogoutAlert = true }) {
-                                Image(systemName: "rectangle.portrait.and.arrow.right")
-                                    .font(.title2)
-                                    .foregroundColor(.red)
-                            }
-                            .padding(.leading, 8)
+                            Image(systemName: "rectangle.portrait.and.arrow.right")
+                                .font(.title2)
+                                .foregroundColor(.red)
+                        }
+                        .padding(.leading, 8)
                     }
                     .padding(.horizontal, 20)
                     .padding(.top, 10)
                     
-                    // 1. Tarjeta Principal (Datos, Medalla, Stats)
+                    // 1. Tarjeta Principal (Datos, Medalla, Stats, Bio)
                     mainInfoCard
                     
                     // 2. Tarjeta de Tecnologías
@@ -71,18 +70,20 @@ struct ProfileView: View {
                     .presentationDetents([.fraction(0.4)])
                     .presentationDragIndicator(.visible)
             }
-            .fullScreenCover(isPresented: $showEditProfile) {
-                EditProfileView()
+            .fullScreenCover(isPresented: $showEditProfile, onDismiss: {
+                Task { await viewModel.fetchFullProfile() }
+            }) {
+                EditProfileView(currentUser: viewModel.user)
             }
             .alert("Cerrar sesión", isPresented: $showLogoutAlert) {
-                    Button("Cancelar", role: .cancel) { }
-                    Button("Salir", role: .destructive) {
-                        Task {
-                            await viewModel.signOut()
-                        }
+                Button("Cancelar", role: .cancel) { }
+                Button("Salir", role: .destructive) {
+                    Task {
+                        await viewModel.signOut()
                     }
-                } message: {
-                    Text("¿Estás seguro de que deseas salir de Fixy?")
+                }
+            } message: {
+                Text("¿Estás seguro de que deseas salir de Fixy?")
             }
         }
     }
@@ -91,30 +92,40 @@ struct ProfileView: View {
     private var mainInfoCard: some View {
         VStack(spacing: 20) {
             // Fila 1: Avatar, Nombre y Medalla
-                        HStack(spacing: 16) {
-                            
-                            // Botón interactivo para cambiar la foto
-                            Button(action: {
-                                viewModel.prepareEditAvatar()
-                                showEditAvatar = true
-                            }) {
-                                if let avatar = viewModel.user.avatarId, !avatar.isEmpty {
-                                    Image(avatar) // 👈 Llama directo a tu Asset ("hacker", "cyborg"...)
-                                        .resizable()
-                                        .scaledToFill()
-                                        .frame(width: 80, height: 80)
-                                        .clipShape(Circle())
-                                        .shadow(color: Color.black.opacity(0.1), radius: 5, y: 2)
-                                } else {
-                                    // Fallback de iniciales
-                                    Text(viewModel.user.initials)
-                                        .font(.title).fontWeight(.bold)
-                                        .foregroundColor(Color("FixyPrimary"))
-                                        .frame(width: 80, height: 80)
-                                        .background(Color("FixyPrimary").opacity(0.15))
-                                        .clipShape(Circle())
-                                }
+            HStack(spacing: 16) {
+                Button(action: { showEditProfile = true }) {
+                    if let avatar = viewModel.user.avatarId, !avatar.isEmpty {
+                        // Verificamos si es una URL de la nube o un asset local
+                        if avatar.hasPrefix("http") {
+                            AsyncImage(url: URL(string: avatar)) { image in
+                                image.resizable().scaledToFill()
+                            } placeholder: {
+                                ProgressView()
                             }
+                            .frame(width: 80, height: 80)
+                            .clipShape(Circle())
+                            .shadow(color: Color.black.opacity(0.1), radius: 5, y: 2)
+                            
+                        } else if avatar == "custom" {
+                            Text(viewModel.user.initials)
+                                .font(.title).fontWeight(.bold).foregroundColor(Color("FixyPrimary"))
+                                .frame(width: 80, height: 80)
+                                .background(Color("FixyPrimary").opacity(0.15)).clipShape(Circle())
+                        } else {
+                            // Es un asset de Xcode ("cyborg", "hacker")
+                            Image(avatar)
+                                .resizable().scaledToFill()
+                                .frame(width: 80, height: 80).clipShape(Circle())
+                                .shadow(color: Color.black.opacity(0.1), radius: 5, y: 2)
+                        }
+                    } else {
+                        // Fallback: no tiene nada
+                        Text(viewModel.user.initials)
+                            .font(.title).fontWeight(.bold).foregroundColor(Color("FixyPrimary"))
+                            .frame(width: 80, height: 80)
+                            .background(Color("FixyPrimary").opacity(0.15)).clipShape(Circle())
+                    }
+                }
                 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(viewModel.user.fullName).font(.title2).fontWeight(.bold)
@@ -125,9 +136,7 @@ struct ProfileView: View {
                 Spacer()
                 
                 Image(viewModel.currentMedal.image)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 60, height: 60)
+                    .resizable().scaledToFit().frame(width: 60, height: 60)
             }
             
             // Fila 2: Grid de Estadísticas
@@ -162,6 +171,26 @@ struct ProfileView: View {
                     Text("\(next.min - viewModel.user.points) pts para \(next.name)")
                         .font(.subheadline)
                         .foregroundColor(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            } // 👈 Fin de VStack de la barra de progreso
+            
+            // 🌟 NUEVA SECCIÓN: BIOGRAFÍA 🌟
+            if !viewModel.user.bio.isEmpty {
+                Divider()
+                    .padding(.vertical, 4)
+                
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("SOBRE MÍ")
+                        .font(.caption2)
+                        .fontWeight(.bold)
+                        .foregroundColor(.secondary)
+                        .tracking(0.5)
+                    
+                    Text(viewModel.user.bio)
+                        .font(.subheadline)
+                        .foregroundColor(.primary)
+                        .fixedSize(horizontal: false, vertical: true) // Evita que se corte
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
@@ -257,84 +286,81 @@ struct ProfileView: View {
     }
     
     // MARK: - Tarjeta 4: Links
-        private var linksCard: some View {
-            VStack(alignment: .leading, spacing: 16) {
-                // 🌟 Se agregó un HStack con Spacer para forzar el ancho total
-                HStack {
-                    Text("LINKS").font(.caption).fontWeight(.bold).foregroundColor(.secondary)
-                    Spacer() // 👈 Este Spacer invisible empuja los bordes al máximo
-                }
-                
-                if viewModel.user.links.isEmpty {
-                    Text("Añade tus redes profesionales aquí.").font(.subheadline).foregroundColor(.secondary)
-                } else {
-                    ForEach(viewModel.user.links) { link in
-                        Link(destination: URL(string: link.url)!) {
-                            HStack(spacing: 12) {
-                                Image(systemName: link.iconName).font(.title3)
-                                Text(link.title).font(.subheadline).fontWeight(.medium)
-                                Spacer()
-                                Image(systemName: "arrow.up.right").font(.caption)
-                            }
-                            .foregroundColor(.primary)
-                            .padding()
-                            .background(Color(UIColor.systemBackground))
-                            .cornerRadius(12)
-                        }
-                    }
-                }
+    private var linksCard: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Text("LINKS").font(.caption).fontWeight(.bold).foregroundColor(.secondary)
+                Spacer()
             }
-            .padding(20)
-            .background(Color(UIColor.secondarySystemBackground))
-            .cornerRadius(20)
-            .padding(.horizontal, 20)
-        }
-        
-        // MARK: - Tarjeta 5: Calificaciones
-        private var reviewsCard: some View {
-            VStack(alignment: .leading, spacing: 16) {
-                // 🌟 Se agregó un HStack con Spacer para forzar el ancho total
-                HStack {
-                    Text("ÚLTIMAS CALIFICACIONES").font(.caption).fontWeight(.bold).foregroundColor(.secondary)
-                    Spacer() // 👈 Este Spacer invisible empuja los bordes al máximo
-                }
-                
-                if viewModel.user.reviews.isEmpty {
-                    Text("Aún no tienes calificaciones.").font(.subheadline).foregroundColor(.secondary)
-                } else {
-                    ForEach(viewModel.user.reviews) { review in
-                        VStack(alignment: .leading, spacing: 8) {
-                            HStack {
-                                Text(review.reviewerInitials)
-                                    .font(.caption).fontWeight(.bold).foregroundColor(.white)
-                                    .frame(width: 30, height: 30).background(Color.gray).clipShape(Circle())
-                                
-                                VStack(alignment: .leading) {
-                                    Text(review.reviewerName).font(.subheadline).fontWeight(.bold)
-                                    Text(review.date).font(.caption2).foregroundColor(.secondary)
-                                }
-                                Spacer()
-                                HStack(spacing: 2) {
-                                    Image(systemName: "star.fill").foregroundColor(.orange)
-                                    Text(String(format: "%.1f", review.rating)).fontWeight(.bold)
-                                }.font(.subheadline)
-                            }
-                            Text(review.comment).font(.subheadline).foregroundColor(.secondary).fixedSize(horizontal: false, vertical: true)
+            
+            if viewModel.user.links.isEmpty {
+                Text("Añade tus redes profesionales aquí.").font(.subheadline).foregroundColor(.secondary)
+            } else {
+                ForEach(viewModel.user.links) { link in
+                    Link(destination: URL(string: link.url)!) {
+                        HStack(spacing: 12) {
+                            Image(systemName: link.iconName).font(.title3)
+                            Text(link.title).font(.subheadline).fontWeight(.medium)
+                            Spacer()
+                            Image(systemName: "arrow.up.right").font(.caption)
                         }
+                        .foregroundColor(.primary)
                         .padding()
                         .background(Color(UIColor.systemBackground))
                         .cornerRadius(12)
                     }
                 }
             }
-            .padding(20)
-            .background(Color(UIColor.secondarySystemBackground))
-            .cornerRadius(20)
-            .padding(.horizontal, 20)
         }
+        .padding(20)
+        .background(Color(UIColor.secondarySystemBackground))
+        .cornerRadius(20)
+        .padding(.horizontal, 20)
+    }
     
-    // MARK: - Modales (Hojas de edición)
+    // MARK: - Tarjeta 5: Calificaciones
+    private var reviewsCard: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Text("ÚLTIMAS CALIFICACIONES").font(.caption).fontWeight(.bold).foregroundColor(.secondary)
+                Spacer()
+            }
+            
+            if viewModel.user.reviews.isEmpty {
+                Text("Aún no tienes calificaciones.").font(.subheadline).foregroundColor(.secondary)
+            } else {
+                ForEach(viewModel.user.reviews) { review in
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Text(review.reviewerInitials)
+                                .font(.caption).fontWeight(.bold).foregroundColor(.white)
+                                .frame(width: 30, height: 30).background(Color.gray).clipShape(Circle())
+                            
+                            VStack(alignment: .leading) {
+                                Text(review.reviewerName).font(.subheadline).fontWeight(.bold)
+                                Text(review.date).font(.caption2).foregroundColor(.secondary)
+                            }
+                            Spacer()
+                            HStack(spacing: 2) {
+                                Image(systemName: "star.fill").foregroundColor(.orange)
+                                Text(String(format: "%.1f", review.rating)).fontWeight(.bold)
+                            }.font(.subheadline)
+                        }
+                        Text(review.comment).font(.subheadline).foregroundColor(.secondary).fixedSize(horizontal: false, vertical: true)
+                    }
+                    .padding()
+                    .background(Color(UIColor.systemBackground))
+                    .cornerRadius(12)
+                }
+            }
+        }
+        .padding(20)
+        .background(Color(UIColor.secondarySystemBackground))
+        .cornerRadius(20)
+        .padding(.horizontal, 20)
+    }
     
+    // MARK: - Modales (Hojas de edición rápidas)
     private var editTechnologiesSheet: some View {
         VStack(alignment: .leading, spacing: 20) {
             Text("Mis especialidades")
@@ -418,68 +444,9 @@ struct ProfileView: View {
                     .cornerRadius(12)
             }
         }
-    
         .padding(24)
         .padding(.top, 10)
     }
-    private var editAvatarSheet: some View {
-            VStack(alignment: .leading, spacing: 20) {
-                Text("Elige tu Avatar")
-                    .font(.title2)
-                    .fontWeight(.bold)
-                    .padding(.horizontal)
-                
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 16) {
-                        ForEach(viewModel.availableAvatars, id: \.self) { avatar in
-                            let isSelected = viewModel.tempAvatarId == avatar
-                            
-                            Button(action: {
-                                viewModel.tempAvatarId = avatar
-                            }) {
-                                VStack {
-                                    Image(avatar)
-                                        .resizable()
-                                        .scaledToFit()
-                                        .frame(width: 70, height: 70)
-                                        .clipShape(Circle())
-                                        .overlay(
-                                            Circle().stroke(isSelected ? Color("FixyPrimary") : Color.clear, lineWidth: 4)
-                                        )
-                                        .shadow(color: isSelected ? Color("FixyPrimary").opacity(0.5) : .clear, radius: 5)
-                                    
-                                    Text(avatar.capitalized)
-                                        .font(.caption)
-                                        .foregroundColor(isSelected ? Color("FixyPrimary") : .secondary)
-                                }
-                            }
-                        }
-                    }
-                    .padding(.horizontal)
-                    .padding(.vertical, 10)
-                }
-                
-                Spacer()
-                
-                Button(action: {
-                    if let newAvatar = viewModel.tempAvatarId {
-                        viewModel.saveAvatar(newAvatar: newAvatar)
-                    }
-                    showEditAvatar = false
-                }) {
-                    Text("Guardar Avatar")
-                        .fontWeight(.bold)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color("FixyPrimary"))
-                        .foregroundColor(.white)
-                        .cornerRadius(12)
-                }
-                .padding(.horizontal, 24)
-                .padding(.bottom, 20)
-            }
-            .padding(.top, 20)
-        }
 }
 
 #Preview {

@@ -66,33 +66,30 @@ final class ProfileViewModel {
                 .execute()
                 .count) ?? 0
             
-            // 3. Descargar Links (Seguro con try?)
-            let links: [UserLinkDTO] = (try? await SupabaseManager.shared.client
-                .from("user_links")
-                .select()
-                .eq("user_id", value: myId)
-                .execute()
-                .value) ?? []
-            
-            // 4. Descargar Reviews (Seguro con try?) 👈 AQUÍ SE DESCARGAN
-            let reviews: [UserReviewDTO] = (try? await SupabaseManager.shared.client
-                .from("user_reviews")
-                .select()
-                .eq("reviewee_id", value: myId)
-                .order("created_at", ascending: false)
-                .execute()
-                .value) ?? []
-            
-            // 5. Ensamblar modelo para la vista
-                        let name = profile.full_name ?? "Estudiante"
+                        var dynamicLinks: [UserLinkDTO] = []
                         
-                        // 👈 Convertimos el número del ciclo a un texto amigable
-                        let cycleString: String
-                        if let cycleNumber = profile.cycle {
-                            cycleString = "\(cycleNumber)° Ciclo"
-                        } else {
-                            cycleString = "1er Ciclo" // Valor por defecto
+                        if let git = profile.github_url, !git.isEmpty {
+                            dynamicLinks.append(UserLinkDTO(id: UUID(), title: "GitHub", url: git, icon_name: "chevron.left.forward.slash"))
                         }
+                        if let lin = profile.linkedin_url, !lin.isEmpty {
+                            dynamicLinks.append(UserLinkDTO(id: UUID(), title: "LinkedIn", url: lin, icon_name: "briefcase"))
+                        }
+                        if let port = profile.portfolio_url, !port.isEmpty {
+                            dynamicLinks.append(UserLinkDTO(id: UUID(), title: "Portafolio", url: port, icon_name: "globe"))
+                        }
+                        
+                        // 4. Descargar Reviews (Queda igual)
+                        let reviews: [UserReviewDTO] = (try? await SupabaseManager.shared.client
+                            .from("user_reviews")
+                            .select()
+                            .eq("reviewee_id", value: myId)
+                            .order("created_at", ascending: false)
+                            .execute()
+                            .value) ?? []
+                        
+                        // 5. Ensamblar modelo para la vista
+                        let name = profile.full_name ?? "Estudiante"
+                        let cycleString = profile.cycle != nil ? "\(profile.cycle!)° Ciclo" : "1er Ciclo"
                         
                         self.user = ProfilePresentationModel(
                             id: profile.id,
@@ -100,19 +97,20 @@ final class ProfileViewModel {
                             avatarId: profile.avatar_id,
                             fullName: name,
                             career: profile.career ?? "Sin carrera asignada",
-                            cycle: cycleString, // 👈 Pasamos el texto convertido
+                            cycle: cycleString,
                             points: myPoints,
                             rankingPosition: higherUsersCount + 1,
                             rating: profile.rating ?? 5.0,
                             completedTasks: profile.completed_tasks ?? 0,
                             technologies: Set(profile.technologies ?? []),
                             phoneNumber: profile.phone_number ?? "",
-                            links: links,
-                            reviews: reviews
+                            links: dynamicLinks, // 👈 Pasamos los links que acabamos de armar
+                            reviews: reviews,
+                            bio: profile.bio ?? ""
                         )
             
         } catch {
-            print("❌ Error cargando perfil: \(error)")
+            print("Error cargando perfil: \(error)")
             self.user.fullName = "Error al cargar"
             self.user.initials = "!!"
         }

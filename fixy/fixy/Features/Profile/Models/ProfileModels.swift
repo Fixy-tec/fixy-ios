@@ -20,6 +20,10 @@ struct ProfileDTO: Decodable {
     let rating: Double?
     let completed_tasks: Int?
     let avatar_id: String?
+    let github_url: String?
+    let linkedin_url: String?
+    let portfolio_url: String?
+    let bio: String?
 }
 
 struct UserLinkDTO: Decodable, Identifiable {
@@ -62,6 +66,7 @@ struct ProfilePresentationModel {
     var phoneNumber: String = ""
     var links: [UserLinkDTO] = []       // 👈 ¡Aquí están los links!
     var reviews: [UserReviewDTO] = []   // 👈 ¡Aquí están las reviews!
+    var bio: String = ""
 }
 
 struct MedalDisplay {
