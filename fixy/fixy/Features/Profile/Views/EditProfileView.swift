@@ -10,7 +10,9 @@ import PhotosUI
 
 struct EditProfileView: View {
     @Environment(\.dismiss) var dismiss
+    var currentUser: ProfilePresentationModel?
     @State private var viewModel = EditProfileViewModel()
+    
     
     var body: some View {
         // 🌟 TRUCO SWIFT 6: Extraemos los valores del ViewModel a constantes locales

@@ -6,88 +6,212 @@
 //
 
 import Foundation
+import Supabase
 import SwiftUI
 
 @Observable
 @MainActor
 final class ProfileViewModel {
-    // Datos del usuario (Simulando lo que vendría de Supabase)
-    var user: UserProfile
+    // Objeto principal que tu vista lee directamente (viewModel.user...)
+    var user = ProfilePresentationModel()
+    var isLoading: Bool = true
     
-    // Catálogo de medallas (Simplificado para el perfil)
-    let allMedals: [(name: String, min: Int, max: Int, image: String)] = [
-        ("Hierro", 0, 299, "hierro"),
-        ("Bronce", 300, 799, "bronce"),
-        ("Plata", 800, 1799, "plata"),
-        ("Oro", 1800, 3499, "oro"),
-        ("Diamante", 3500, 5999, "diamante"),
-        ("Maestro", 6000, 9999, "maestro"),
-        ("Challenger", 10000, 99999, "challenger")
-    ]
-    
-    // Lista global de tecnologías para el modal de edición
-    let availableTags = ["TypeScript", "Supabase", "SQL", "Spring Boot", "Seguridad", "Rust", "Redes", "React", "Raspberry Pi", "Python", "Node.js", "Next.js", "Matematicas", "Machine Learning", "Logica de programacion", "Linux", "Dart", "Flutter", "Firebase"]
-    
-    // Estado temporal para los modales
+    // Variables temporales para la edición (Modales)
     var tempTechnologies: Set<String> = []
     var tempPhoneNumber: String = ""
+    var tempAvatarId: String? = nil
+    let availableAvatars = ["arte", "cyborg", "hacker", "karate", "money", "pirata"]
+    
+    // Lista centralizada de Tecnologías (Viene de tu AppConstants)
+    var availableTags: [String] {
+        return AppConstants.tags
+    }
+    
+    // Sistema de Medallas
+    let allTiers: [MedalTier] = [
+        MedalTier(name: "Hierro", minPoints: 0, maxPoints: 499),
+        MedalTier(name: "Bronce", minPoints: 500, maxPoints: 999),
+        MedalTier(name: "Plata", minPoints: 1000, maxPoints: 1999),
+        MedalTier(name: "Oro", minPoints: 2000, maxPoints: 3499),
+        MedalTier(name: "Diamante", minPoints: 3500, maxPoints: 5999),
+        MedalTier(name: "Maestro", minPoints: 6000, maxPoints: 9999),
+        MedalTier(name: "Challenger", minPoints: 10000, maxPoints: nil)
+    ]
     
     init() {
-        self.user = UserProfile(
-            fullName: "Sofia Rios",
-            career: "Desarrollo de Software",
-            cycle: "Ciclo 6",
-            points: 4320,
-            rankingPosition: 2,
-            rating: 4.9,
-            completedTasks: 0,
-            technologies: ["Python", "Dart", "Flutter", "Firebase", "Supabase"],
-            phoneNumber: "987654321",
-            links: [
-                ProfileLink(title: "GitHub", url: "https://github.com", iconName: "chevron.left.forward.slash.o"),
-                ProfileLink(title: "LinkedIn", url: "https://linkedin.com", iconName: "network")
-            ],
-            reviews: [
-                UserReview(reviewerName: "Marco Villanueva", rating: 5.0, comment: "Excelente asesora, me ayudó a entender Supabase en 1 hora. Muy recomendada.", date: "Hace 2 días")
-            ]
-        )
+        Task { await fetchFullProfile() }
     }
     
-    // Propiedades calculadas para la medalla
-    var currentMedal: (name: String, min: Int, max: Int, image: String) {
-        allMedals.first { user.points >= $0.min && user.points <= $0.max } ?? allMedals[0]
-    }
-    
-    var nextMedal: (name: String, min: Int, max: Int, image: String)? {
-        if let currentIndex = allMedals.firstIndex(where: { $0.name == currentMedal.name }), currentIndex + 1 < allMedals.count {
-            return allMedals[currentIndex + 1]
+    func fetchFullProfile() async {
+        self.isLoading = true
+        guard let myId = SupabaseManager.shared.client.auth.currentUser?.id else { return }
+        
+        do {
+            // 1. Descargar Perfil (Obligatorio)
+            let profile: ProfileDTO = try await SupabaseManager.shared.client
+                .from("profiles")
+                .select()
+                .eq("id", value: myId)
+                .single()
+                .execute()
+                .value
+            
+            let myPoints = profile.total_points ?? 0
+            
+            // 2. Descargar posición en el ranking (Calcula cuántos tienen más puntos)
+            let higherUsersCount = (try? await SupabaseManager.shared.client
+                .from("profiles")
+                .select("*", head: true)
+                .gt("total_points", value: myPoints)
+                .execute()
+                .count) ?? 0
+            
+            // 3. Descargar Links (Seguro con try?)
+            let links: [UserLinkDTO] = (try? await SupabaseManager.shared.client
+                .from("user_links")
+                .select()
+                .eq("user_id", value: myId)
+                .execute()
+                .value) ?? []
+            
+            // 4. Descargar Reviews (Seguro con try?) 👈 AQUÍ SE DESCARGAN
+            let reviews: [UserReviewDTO] = (try? await SupabaseManager.shared.client
+                .from("user_reviews")
+                .select()
+                .eq("reviewee_id", value: myId)
+                .order("created_at", ascending: false)
+                .execute()
+                .value) ?? []
+            
+            // 5. Ensamblar modelo para la vista
+                        let name = profile.full_name ?? "Estudiante"
+                        
+                        // 👈 Convertimos el número del ciclo a un texto amigable
+                        let cycleString: String
+                        if let cycleNumber = profile.cycle {
+                            cycleString = "\(cycleNumber)° Ciclo"
+                        } else {
+                            cycleString = "1er Ciclo" // Valor por defecto
+                        }
+                        
+                        self.user = ProfilePresentationModel(
+                            id: profile.id,
+                            initials: String(name.prefix(2)).uppercased(),
+                            avatarId: profile.avatar_id,
+                            fullName: name,
+                            career: profile.career ?? "Sin carrera asignada",
+                            cycle: cycleString, // 👈 Pasamos el texto convertido
+                            points: myPoints,
+                            rankingPosition: higherUsersCount + 1,
+                            rating: profile.rating ?? 5.0,
+                            completedTasks: profile.completed_tasks ?? 0,
+                            technologies: Set(profile.technologies ?? []),
+                            phoneNumber: profile.phone_number ?? "",
+                            links: links,
+                            reviews: reviews
+                        )
+            
+        } catch {
+            print("❌ Error cargando perfil: \(error)")
+            self.user.fullName = "Error al cargar"
+            self.user.initials = "!!"
         }
-        return nil
+        self.isLoading = false
+    }
+    
+    // MARK: - Cálculos de Medallas
+    
+    var currentMedal: MedalDisplay {
+        let pts = user.points
+        let tier = allTiers.first { pts >= $0.minPoints && (pts <= ($0.maxPoints ?? Int.max)) } ?? allTiers[0]
+        return MedalDisplay(name: tier.name, min: tier.minPoints, image: tier.name.lowercased())
+    }
+    
+    var nextMedal: MedalDisplay? {
+        let pts = user.points
+        guard let currentIndex = allTiers.firstIndex(where: { pts >= $0.minPoints && (pts <= ($0.maxPoints ?? Int.max)) }),
+              currentIndex + 1 < allTiers.count else { return nil }
+        let nextTier = allTiers[currentIndex + 1]
+        return MedalDisplay(name: nextTier.name, min: nextTier.minPoints, image: nextTier.name.lowercased())
     }
     
     var progressPercentage: Double {
+        let pts = Double(user.points)
+        let min = Double(currentMedal.min)
         guard let next = nextMedal else { return 1.0 }
-        let range = Double(next.min - currentMedal.min)
-        let currentProgress = Double(user.points - currentMedal.min)
-        return currentProgress / range
+        let max = Double(next.min)
+        let range = max - min
+        return range > 0 ? (pts - min) / range : 1.0
     }
     
-    // Funciones de guardado
-    func prepareEditTech() { tempTechnologies = user.technologies }
-    func saveTech() { user.technologies = tempTechnologies }
+    // MARK: - Funciones de Edición de tu Vista
     
-    func prepareEditPhone() { tempPhoneNumber = user.phoneNumber }
-    func savePhone() { user.phoneNumber = tempPhoneNumber }
+    func prepareEditTech() {
+        self.tempTechnologies = self.user.technologies
+    }
     
-    // MARK: - Autenticación
+    func saveTech() {
+        let tagsArray = Array(tempTechnologies)
+        self.user.technologies = self.tempTechnologies // Actualización local instantánea
         
-        func signOut() async {
+        Task {
             do {
-                // Llama a la función nativa de Supabase para cerrar sesión
-                try await SupabaseManager.shared.client.auth.signOut()
-                print("👋 Sesión cerrada exitosamente")
+                try await SupabaseManager.shared.client
+                    .from("profiles")
+                    .update(["technologies": tagsArray])
+                    .eq("id", value: user.id)
+                    .execute()
             } catch {
-                print("❌ Error al cerrar sesión: \(error.localizedDescription)")
+                print("Error guardando tags: \(error)")
+            }
+        }
+    }
+    
+    func prepareEditPhone() {
+        self.tempPhoneNumber = self.user.phoneNumber
+    }
+    
+    func savePhone() {
+        self.user.phoneNumber = self.tempPhoneNumber // Actualización local instantánea
+        
+        Task {
+            do {
+                try await SupabaseManager.shared.client
+                    .from("profiles")
+                    .update(["phone_number": tempPhoneNumber])
+                    .eq("id", value: user.id)
+                    .execute()
+            } catch {
+                print("Error guardando teléfono: \(error)")
+            }
+        }
+    }
+    
+    func signOut() async {
+        do {
+            try await SupabaseManager.shared.client.auth.signOut()
+        } catch {
+            print("Error cerrando sesión: \(error)")
+        }
+    }
+    
+    func prepareEditAvatar() {
+            self.tempAvatarId = self.user.avatarId
+        }
+        
+        func saveAvatar(newAvatar: String) {
+            self.user.avatarId = newAvatar
+            
+            Task {
+                do {
+                    try await SupabaseManager.shared.client
+                        .from("profiles")
+                        .update(["avatar_id": newAvatar])
+                        .eq("id", value: user.id)
+                        .execute()
+                } catch {
+                    print("Error guardando avatar: \(error)")
+                }
             }
         }
 }

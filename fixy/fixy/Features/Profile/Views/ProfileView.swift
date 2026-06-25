@@ -15,6 +15,7 @@ struct ProfileView: View {
     @State private var showEditPhone = false
     @State private var showEditProfile = false
     @State private var showLogoutAlert = false
+    @State private var showEditAvatar = false
     
     var body: some View {
         NavigationStack {
@@ -90,14 +91,30 @@ struct ProfileView: View {
     private var mainInfoCard: some View {
         VStack(spacing: 20) {
             // Fila 1: Avatar, Nombre y Medalla
-            HStack(spacing: 16) {
-                Text(viewModel.user.initials)
-                    .font(.title)
-                    .fontWeight(.bold)
-                    .foregroundColor(Color("FixyPrimary"))
-                    .frame(width: 80, height: 80)
-                    .background(Color("FixyPrimary").opacity(0.15))
-                    .clipShape(Circle())
+                        HStack(spacing: 16) {
+                            
+                            // Botón interactivo para cambiar la foto
+                            Button(action: {
+                                viewModel.prepareEditAvatar()
+                                showEditAvatar = true
+                            }) {
+                                if let avatar = viewModel.user.avatarId, !avatar.isEmpty {
+                                    Image(avatar) // 👈 Llama directo a tu Asset ("hacker", "cyborg"...)
+                                        .resizable()
+                                        .scaledToFill()
+                                        .frame(width: 80, height: 80)
+                                        .clipShape(Circle())
+                                        .shadow(color: Color.black.opacity(0.1), radius: 5, y: 2)
+                                } else {
+                                    // Fallback de iniciales
+                                    Text(viewModel.user.initials)
+                                        .font(.title).fontWeight(.bold)
+                                        .foregroundColor(Color("FixyPrimary"))
+                                        .frame(width: 80, height: 80)
+                                        .background(Color("FixyPrimary").opacity(0.15))
+                                        .clipShape(Circle())
+                                }
+                            }
                 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(viewModel.user.fullName).font(.title2).fontWeight(.bold)
@@ -239,74 +256,82 @@ struct ProfileView: View {
         .padding(.horizontal, 20)
     }
     
-    // MARK: - Tarjeta 4: Links (Extra según descripción)
-    private var linksCard: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("LINKS").font(.caption).fontWeight(.bold).foregroundColor(.secondary)
-            
-            if viewModel.user.links.isEmpty {
-                Text("Añade tus redes profesionales aquí.").font(.subheadline).foregroundColor(.secondary)
-            } else {
-                ForEach(viewModel.user.links) { link in
-                    Link(destination: URL(string: link.url)!) {
-                        HStack(spacing: 12) {
-                            Image(systemName: link.iconName).font(.title3)
-                            Text(link.title).font(.subheadline).fontWeight(.medium)
-                            Spacer()
-                            Image(systemName: "arrow.up.right").font(.caption)
+    // MARK: - Tarjeta 4: Links
+        private var linksCard: some View {
+            VStack(alignment: .leading, spacing: 16) {
+                // 🌟 Se agregó un HStack con Spacer para forzar el ancho total
+                HStack {
+                    Text("LINKS").font(.caption).fontWeight(.bold).foregroundColor(.secondary)
+                    Spacer() // 👈 Este Spacer invisible empuja los bordes al máximo
+                }
+                
+                if viewModel.user.links.isEmpty {
+                    Text("Añade tus redes profesionales aquí.").font(.subheadline).foregroundColor(.secondary)
+                } else {
+                    ForEach(viewModel.user.links) { link in
+                        Link(destination: URL(string: link.url)!) {
+                            HStack(spacing: 12) {
+                                Image(systemName: link.iconName).font(.title3)
+                                Text(link.title).font(.subheadline).fontWeight(.medium)
+                                Spacer()
+                                Image(systemName: "arrow.up.right").font(.caption)
+                            }
+                            .foregroundColor(.primary)
+                            .padding()
+                            .background(Color(UIColor.systemBackground))
+                            .cornerRadius(12)
                         }
-                        .foregroundColor(.primary)
+                    }
+                }
+            }
+            .padding(20)
+            .background(Color(UIColor.secondarySystemBackground))
+            .cornerRadius(20)
+            .padding(.horizontal, 20)
+        }
+        
+        // MARK: - Tarjeta 5: Calificaciones
+        private var reviewsCard: some View {
+            VStack(alignment: .leading, spacing: 16) {
+                // 🌟 Se agregó un HStack con Spacer para forzar el ancho total
+                HStack {
+                    Text("ÚLTIMAS CALIFICACIONES").font(.caption).fontWeight(.bold).foregroundColor(.secondary)
+                    Spacer() // 👈 Este Spacer invisible empuja los bordes al máximo
+                }
+                
+                if viewModel.user.reviews.isEmpty {
+                    Text("Aún no tienes calificaciones.").font(.subheadline).foregroundColor(.secondary)
+                } else {
+                    ForEach(viewModel.user.reviews) { review in
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack {
+                                Text(review.reviewerInitials)
+                                    .font(.caption).fontWeight(.bold).foregroundColor(.white)
+                                    .frame(width: 30, height: 30).background(Color.gray).clipShape(Circle())
+                                
+                                VStack(alignment: .leading) {
+                                    Text(review.reviewerName).font(.subheadline).fontWeight(.bold)
+                                    Text(review.date).font(.caption2).foregroundColor(.secondary)
+                                }
+                                Spacer()
+                                HStack(spacing: 2) {
+                                    Image(systemName: "star.fill").foregroundColor(.orange)
+                                    Text(String(format: "%.1f", review.rating)).fontWeight(.bold)
+                                }.font(.subheadline)
+                            }
+                            Text(review.comment).font(.subheadline).foregroundColor(.secondary).fixedSize(horizontal: false, vertical: true)
+                        }
                         .padding()
                         .background(Color(UIColor.systemBackground))
                         .cornerRadius(12)
                     }
                 }
             }
+            .padding(20)
+            .background(Color(UIColor.secondarySystemBackground))
+            .cornerRadius(20)
+            .padding(.horizontal, 20)
         }
-        .padding(20)
-        .background(Color(UIColor.secondarySystemBackground))
-        .cornerRadius(20)
-        .padding(.horizontal, 20)
-    }
-    
-    // MARK: - Tarjeta 5: Calificaciones (Extra según descripción)
-    private var reviewsCard: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("ÚLTIMAS CALIFICACIONES").font(.caption).fontWeight(.bold).foregroundColor(.secondary)
-            
-            if viewModel.user.reviews.isEmpty {
-                Text("Aún no tienes calificaciones.").font(.subheadline).foregroundColor(.secondary)
-            } else {
-                ForEach(viewModel.user.reviews) { review in
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            Text(review.reviewerInitials)
-                                .font(.caption).fontWeight(.bold).foregroundColor(.white)
-                                .frame(width: 30, height: 30).background(Color.gray).clipShape(Circle())
-                            
-                            VStack(alignment: .leading) {
-                                Text(review.reviewerName).font(.subheadline).fontWeight(.bold)
-                                Text(review.date).font(.caption2).foregroundColor(.secondary)
-                            }
-                            Spacer()
-                            HStack(spacing: 2) {
-                                Image(systemName: "star.fill").foregroundColor(.orange)
-                                Text(String(format: "%.1f", review.rating)).fontWeight(.bold)
-                            }.font(.subheadline)
-                        }
-                        Text(review.comment).font(.subheadline).foregroundColor(.secondary).fixedSize(horizontal: false, vertical: true)
-                    }
-                    .padding()
-                    .background(Color(UIColor.systemBackground))
-                    .cornerRadius(12)
-                }
-            }
-        }
-        .padding(20)
-        .background(Color(UIColor.secondarySystemBackground))
-        .cornerRadius(20)
-        .padding(.horizontal, 20)
-    }
     
     // MARK: - Modales (Hojas de edición)
     
@@ -393,9 +418,68 @@ struct ProfileView: View {
                     .cornerRadius(12)
             }
         }
+    
         .padding(24)
         .padding(.top, 10)
     }
+    private var editAvatarSheet: some View {
+            VStack(alignment: .leading, spacing: 20) {
+                Text("Elige tu Avatar")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .padding(.horizontal)
+                
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 16) {
+                        ForEach(viewModel.availableAvatars, id: \.self) { avatar in
+                            let isSelected = viewModel.tempAvatarId == avatar
+                            
+                            Button(action: {
+                                viewModel.tempAvatarId = avatar
+                            }) {
+                                VStack {
+                                    Image(avatar)
+                                        .resizable()
+                                        .scaledToFit()
+                                        .frame(width: 70, height: 70)
+                                        .clipShape(Circle())
+                                        .overlay(
+                                            Circle().stroke(isSelected ? Color("FixyPrimary") : Color.clear, lineWidth: 4)
+                                        )
+                                        .shadow(color: isSelected ? Color("FixyPrimary").opacity(0.5) : .clear, radius: 5)
+                                    
+                                    Text(avatar.capitalized)
+                                        .font(.caption)
+                                        .foregroundColor(isSelected ? Color("FixyPrimary") : .secondary)
+                                }
+                            }
+                        }
+                    }
+                    .padding(.horizontal)
+                    .padding(.vertical, 10)
+                }
+                
+                Spacer()
+                
+                Button(action: {
+                    if let newAvatar = viewModel.tempAvatarId {
+                        viewModel.saveAvatar(newAvatar: newAvatar)
+                    }
+                    showEditAvatar = false
+                }) {
+                    Text("Guardar Avatar")
+                        .fontWeight(.bold)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color("FixyPrimary"))
+                        .foregroundColor(.white)
+                        .cornerRadius(12)
+                }
+                .padding(.horizontal, 24)
+                .padding(.bottom, 20)
+            }
+            .padding(.top, 20)
+        }
 }
 
 #Preview {

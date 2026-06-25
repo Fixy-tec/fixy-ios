@@ -7,68 +7,104 @@
 
 import Foundation
 import SwiftUI
-import PhotosUI // Necesario para acceder a la galería del dispositivo
+import PhotosUI
+import Supabase
 
 @Observable
 @MainActor
 final class EditProfileViewModel {
-    // Campos del formulario (Inicializados con datos de ejemplo)
-    var fullName: String = "Sofia Rios"
-    var career: String = "Desarrollo de Software"
-    var cycle: String = "6"
+    // MARK: - Avatar
+    var selectedAvatar: String = "cyborg"
+    var customAvatarData: Data? = nil
+    var selectedPhotoItem: PhotosPickerItem? = nil
+    let predefinedAvatars = ["arte", "cyborg", "hacker", "karate", "money", "pirata"]
+    
+    // MARK: - Datos Personales
+    var fullName: String = ""
+    var career: String = ""
+    var cycle: String = "" // Tu vista usa String para el TextField
+    
+    // MARK: - Bio y URLs
     var bio: String = ""
     var githubUrl: String = ""
     var linkedinUrl: String = ""
     var portfolioUrl: String = ""
     
-    // Gestión del Avatar
-    let predefinedAvatars = ["avatar_1", "avatar_2", "avatar_3", "avatar_4"] // Ajusta a los nombres de tus assets
-    var selectedAvatar: String = "avatar_1"
+    // MARK: - Errores de Validación
+    var nameError: String? = nil
+    var careerError: String? = nil
+    var cycleError: String? = nil
+    var isLoading: Bool = false
     
-    // Variables para la selección de foto de la galería
-    var selectedPhotoItem: PhotosPickerItem? = nil
-    var customAvatarData: Data? = nil
-    
-    // MARK: - Validaciones en Tiempo Real
-    
-    var nameError: String? {
-        let hasNumbers = fullName.rangeOfCharacter(from: .decimalDigits) != nil
-        return hasNumbers ? "El nombre no puede contener números" : nil
-    }
-    
-    var careerError: String? {
-        let hasNumbers = career.rangeOfCharacter(from: .decimalDigits) != nil
-        return hasNumbers ? "La carrera no puede contener números" : nil
-    }
-    
-    var cycleError: String? {
-        guard let cycleInt = Int(cycle) else { return nil }
-        return (cycleInt < 1 || cycleInt > 10) ? "El ciclo debe ser entre 1 y 10" : nil
-    }
-    
+    // MARK: - Validación Reactiva
     var isFormValid: Bool {
-        return nameError == nil &&
-               careerError == nil &&
-               cycleError == nil &&
-               !fullName.isEmpty &&
-               !career.isEmpty
+        let isNameValid = !fullName.trimmingCharacters(in: .whitespaces).isEmpty
+        let isCareerValid = !career.trimmingCharacters(in: .whitespaces).isEmpty
+        let isCycleValid = Int(cycle) != nil && (1...10).contains(Int(cycle)!)
+        
+        return isNameValid && isCareerValid && isCycleValid
     }
     
-    // MARK: - Funciones
-    
-    // Procesa la imagen seleccionada de la galería nativa
+    // MARK: - Procesar Foto Personalizada
     func processSelectedPhoto() async {
         guard let item = selectedPhotoItem else { return }
-        if let data = try? await item.loadTransferable(type: Data.self) {
-            self.customAvatarData = data
-            self.selectedAvatar = "custom" // Indicador de que usamos foto propia
+        do {
+            if let data = try await item.loadTransferable(type: Data.self) {
+                self.customAvatarData = data
+                self.selectedAvatar = "custom"
+            }
+        } catch {
+            print("Error cargando la foto: \(error)")
         }
     }
     
+    // MARK: - Pre-llenar Formulario
+    func loadCurrentData(user: ProfilePresentationModel) {
+        self.fullName = user.fullName == "Cargando..." ? "" : user.fullName
+        self.career = user.career == "Sin carrera asignada" ? "" : user.career
+        
+        let cleanedCycle = user.cycle.components(separatedBy: CharacterSet.decimalDigits.inverted).joined()
+        self.cycle = cleanedCycle.isEmpty ? "1" : cleanedCycle
+        
+        // Asumiendo que agregas bio y urls a tu ProfilePresentationModel luego
+        self.selectedAvatar = user.avatarId ?? "cyborg"
+    }
+    
+    // MARK: - Guardar en Supabase
     func saveProfile() {
-        if isFormValid {
-            print("🚀 Guardando perfil de: \(fullName)")
-            // Aquí irá la lógica de Supabase en el futuro
+        guard let userId = SupabaseManager.shared.client.auth.currentUser?.id else { return }
+        self.isLoading = true
+        
+        // Convertimos el ciclo a Int (es seguro por la validación isFormValid)
+        let cycleInt = Int(cycle) ?? 1
+        
+        let updateData = ProfileUpdateDTO(
+            full_name: fullName,
+            career: career,
+            cycle: cycleInt,
+            bio: bio,
+            github_url: githubUrl,
+            linkedin_url: linkedinUrl,
+            portfolio_url: portfolioUrl,
+            avatar_id: selectedAvatar
+        )
+        
+        Task {
+            do {
+                // NOTA: Si 'selectedAvatar' es "custom", idealmente aquí subirías 'customAvatarData'
+                // a un Storage Bucket de Supabase y guardarías la URL pública.
+                // Por ahora guardaremos la selección estática o la etiqueta "custom".
+                
+                try await SupabaseManager.shared.client
+                    .from("profiles")
+                    .update(updateData)
+                    .eq("id", value: userId)
+                    .execute()
+                
+            } catch {
+                print("❌ Error al guardar perfil: \(error)")
+            }
+            self.isLoading = false
         }
     }
 }
