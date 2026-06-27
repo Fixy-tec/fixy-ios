@@ -284,10 +284,6 @@ struct MyRequestsView: View {
                 .font(.headline)
                 .foregroundColor(.primary)
                 .lineLimit(2)
-            
-            //Text("\(req.applicants_count ?? 1) postulante(s) aceptado(s)")
-                //.font(.subheadline)
-                //.foregroundColor(.secondary)
         }
         .padding(16)
         .background(Color(UIColor.secondarySystemBackground))
