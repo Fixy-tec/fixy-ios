@@ -49,18 +49,19 @@ final class MyRequestsViewModel {
     
     // 2. Creadas (Mis solicitudes abiertas/canceladas)
     private func fetchMyCreatedRequests() async {
-        guard let userId = try? await SupabaseManager.shared.client.auth.session.user.id else { return }
+        guard let userId = SupabaseManager.shared.client.auth.currentUser?.id else { return }
         do {
-            let fetched: [MyRequestDTO] = try await SupabaseManager.shared.client
+            // Agregamos la relación de 'applications' para que el conteo sea real
+            self.myCreatedRequests = try await SupabaseManager.shared.client
                 .from("requests")
-                .select("*, profiles(full_name, medal)")
+                .select("*, profiles(full_name, medal), applications(*)")
                 .eq("creator_id", value: userId)
-                .in("status", values: ["abierta", "cancelada"]) // Mostramos abiertas y canceladas aquí
+                .in("status", values: ["abierta", "cancelada", "en_proceso"])
                 .order("created_at", ascending: false)
-                .execute()
-                .value
-            self.myCreatedRequests = fetched
-        } catch { print("Error cargando creadas: \(error)") }
+                .execute().value
+        } catch {
+            print("Error al cargar mis solicitudes creadas: \(error)")
+        }
     }
     
     // 3. En Proceso
