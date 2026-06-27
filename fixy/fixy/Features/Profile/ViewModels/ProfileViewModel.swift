@@ -106,7 +106,10 @@ final class ProfileViewModel {
                             phoneNumber: profile.phone_number ?? "",
                             links: dynamicLinks, // 👈 Pasamos los links que acabamos de armar
                             reviews: reviews,
-                            bio: profile.bio ?? ""
+                            bio: profile.bio ?? "",
+                            githubUrl: profile.github_url ?? "",
+                            linkedinUrl: profile.linkedin_url ?? "",
+                            portfolioUrl: profile.portfolio_url ?? ""
                         )
             
         } catch {

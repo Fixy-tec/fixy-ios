@@ -72,7 +72,7 @@ final class RequestDetailViewModel {
                 }
             }
         } catch {
-            print("❌ Error cargando detalle de solicitud: \(error)")
+            print("Error cargando detalle de solicitud: \(error)")
         }
         
         self.isLoading = false
@@ -90,7 +90,7 @@ final class RequestDetailViewModel {
             self.applicationMessage = message
             return true
         } catch {
-            print("❌ Error al postular: \(error)")
+            print("Error al postular: \(error)")
             return false
         }
     }
@@ -105,14 +105,10 @@ final class RequestDetailViewModel {
             try await SupabaseManager.shared.client.from("requests").update(["status": "en_proceso"]).eq("id", value: req.id).execute()
             
             // 3. Refrescar los datos en pantalla
-            if let index = applicants.firstIndex(where: { $0.id == applicationId }) {
-                applicants[index].status = "aprobado"
-                self.request?.status = "en_proceso" // Solo actualizamos localmente para no hacer otro fetch (aunque da error en Swift 6 si es 'let', por eso arriba RequestDetailDTO tiene properties fijas, haremos un reload)
-            }
             await loadDetails(requestId: req.id)
             
         } catch {
-            print("❌ Error al aceptar postulante: \(error)")
+            print("Error al aceptar postulante: \(error)")
         }
     }
     
@@ -122,7 +118,47 @@ final class RequestDetailViewModel {
             try await SupabaseManager.shared.client.from("requests").update(["status": "completada"]).eq("id", value: req.id).execute()
             await loadDetails(requestId: req.id) // Refrescar
         } catch {
-            print("❌ Error al completar solicitud: \(error)")
+            print("Error al completar solicitud: \(error)")
+        }
+    }
+    
+    // 🌟 INTEGRACIÓN FASE 4: Función para enviar calificación
+    func submitReview(revieweeId: UUID, rating: Double, comment: String) async {
+        guard let req = request,
+              let userId = SupabaseManager.shared.client.auth.currentUser?.id else { return }
+        
+        // Obtenemos los datos del reviewer (el usuario actual) para la reseña
+        guard let myProfile: ProfileDTO = try? await SupabaseManager.shared.client
+            .from("profiles")
+            .select()
+            .eq("id", value: userId)
+            .single()
+            .execute()
+            .value else { return }
+        
+        let reviewerName = myProfile.full_name ?? "Usuario"
+        let initials = String(reviewerName.prefix(2)).uppercased()
+        
+        // Parámetros para la función RPC
+        let params: [String: AnyJSON] = [
+            "p_request_id": .string(req.id.uuidString),
+            "p_reviewee_id": .string(revieweeId.uuidString),
+            "p_reviewer_name": .string(reviewerName),
+            "p_reviewer_initials": .string(initials),
+            "p_rating": .double(rating),
+            "p_comment": .string(comment),
+            "p_points_reward": .integer(req.points_reward)
+        ]
+        
+        do {
+            try await SupabaseManager.shared.client
+                .rpc("procesar_calificacion_y_recompensa", params: params)
+                .execute()
+            
+            // Refrescamos los datos para que el estado de la solicitud cambie a 'calificada' en la UI
+            await loadDetails(requestId: req.id)
+        } catch {
+            print("Error enviando calificación: \(error)")
         }
     }
 }

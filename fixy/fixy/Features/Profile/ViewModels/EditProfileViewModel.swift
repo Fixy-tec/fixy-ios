@@ -55,6 +55,10 @@ final class EditProfileViewModel {
         self.career = user.career
         self.cycle = user.cycle.components(separatedBy: CharacterSet.decimalDigits.inverted).joined()
         self.selectedAvatar = user.avatarId ?? "cyborg"
+        self.bio = user.bio
+        self.githubUrl = user.githubUrl
+        self.linkedinUrl = user.linkedinUrl
+        self.portfolioUrl = user.portfolioUrl
     }
     
     // MARK: - Guardar en Supabase

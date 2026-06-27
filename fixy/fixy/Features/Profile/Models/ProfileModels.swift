@@ -64,9 +64,12 @@ struct ProfilePresentationModel {
     var completedTasks: Int = 0
     var technologies: Set<String> = []
     var phoneNumber: String = ""
-    var links: [UserLinkDTO] = []       // 👈 ¡Aquí están los links!
-    var reviews: [UserReviewDTO] = []   // 👈 ¡Aquí están las reviews!
+    var links: [UserLinkDTO] = []  
+    var reviews: [UserReviewDTO] = []
     var bio: String = ""
+    var githubUrl: String = ""
+    var linkedinUrl: String = ""
+    var portfolioUrl: String = ""
 }
 
 struct MedalDisplay {

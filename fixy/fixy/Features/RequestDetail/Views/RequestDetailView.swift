@@ -13,6 +13,13 @@ struct RequestDetailView: View {
     @State private var showApplySheet = false
     @State private var applyMessage = ""
     
+    // 🌟 ESTADOS PARA LA CALIFICACIÓN
+    @State private var showRatingSheet = false
+    @State private var rating: Int = 0
+    @State private var comment: String = ""
+    @State private var applicantToRate: UUID? = nil
+    @State private var applicantNameToRate: String = ""
+    
     var body: some View {
         Group {
             if viewModel.isLoading {
@@ -98,6 +105,11 @@ struct RequestDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .task { await viewModel.loadDetails(requestId: requestId) }
         .sheet(isPresented: $showApplySheet) { applySheet }
+        .sheet(isPresented: $showRatingSheet) {
+            ratingBottomSheet
+                .presentationDetents([.fraction(0.45)])
+                .presentationDragIndicator(.visible)
+        }
     }
     
     // MARK: - Vista del Creador
@@ -113,6 +125,24 @@ struct RequestDetailView: View {
                     .fontWeight(.bold).frame(maxWidth: .infinity).padding().background(Color("FixyPrimary")).foregroundColor(.white).cornerRadius(12)
                 }
                 .padding(.bottom, 10)
+                
+            } else if viewModel.request?.status == "completada" {
+                if viewModel.applicants.contains(where: { $0.status == "aprobado" }) {
+                    Button(action: {
+                        if let approved = viewModel.applicants.first(where: { $0.status == "aprobado" }) {
+                            self.applicantToRate = approved.applicant_id
+                            self.applicantNameToRate = approved.profiles?.full_name ?? "el estudiante"
+                            self.showRatingSheet = true
+                        }
+                    }) {
+                        HStack {
+                            Image(systemName: "star.fill")
+                            Text("Calificar trabajo")
+                        }
+                        .fontWeight(.bold).frame(maxWidth: .infinity).padding().background(Color.yellow).foregroundColor(.white).cornerRadius(12)
+                    }
+                    .padding(.bottom, 10)
+                }
             }
             
             Text("Postulantes (\(viewModel.applicants.count))").font(.headline)
@@ -143,6 +173,7 @@ struct RequestDetailView: View {
                                     }.padding(.horizontal, 8).padding(.vertical, 2).background(Color.blue.opacity(0.1)).clipShape(Capsule())
                                 }
                                 
+                                // CORRECCIÓN: applicant.status no es opcional, se retira el ?? "Pendiente"
                                 Text(applicant.status.capitalized)
                                     .font(.caption2).bold()
                                     .foregroundColor(applicant.status == "aprobado" ? .green : .orange)
@@ -152,13 +183,14 @@ struct RequestDetailView: View {
                             }
                         }
                         
+                        // CORRECCIÓN: applicant.message no es opcional, se valida directamente
                         if !applicant.message.isEmpty {
                             Text(applicant.message).font(.subheadline).foregroundColor(.secondary)
                         }
                         
                         if applicant.status == "pendiente" && viewModel.request?.status == "abierta" {
                             HStack(spacing: 12) {
-                                Button(action: {}) { // Lógica de rechazar a futuro
+                                Button(action: {}) {
                                     Text("Rechazar").frame(maxWidth: .infinity).padding(.vertical, 10).background(Color.white).foregroundColor(.primary).overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.gray.opacity(0.3), lineWidth: 1))
                                 }
                                 Button(action: {
@@ -212,6 +244,7 @@ struct RequestDetailView: View {
         HStack { Image(systemName: icon).foregroundColor(.secondary).frame(width: 20); Text(text).font(.subheadline); Spacer() }
     }
     
+    // CORRECCIÓN: status se define como String, ya no String?
     private func statusBadge(status: String) -> some View {
         let isAbierta = status == "abierta"
         let isEnProceso = status == "en_proceso"
@@ -251,10 +284,86 @@ struct RequestDetailView: View {
         .presentationDetents([.medium])
         .presentationDragIndicator(.visible)
     }
+    
+    // 🌟 Hoja inferior para Calificar el Trabajo
+    private var ratingBottomSheet: some View {
+        VStack(spacing: 20) {
+            Text("Calificar a \(applicantNameToRate)")
+                .font(.title3)
+                .fontWeight(.bold)
+            
+            Text("Tu calificación afecta los puntos del usuario.")
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+            
+            // Estrellas interactivas
+            HStack(spacing: 10) {
+                ForEach(1...5, id: \.self) { index in
+                    Image(systemName: index <= rating ? "star.fill" : "star")
+                        .font(.largeTitle)
+                        .foregroundColor(index <= rating ? .yellow : .gray.opacity(0.3))
+                        .onTapGesture {
+                            withAnimation {
+                                rating = index
+                            }
+                        }
+                }
+            }
+            
+            Text(ratingDescription(for: rating))
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+            
+            // Comentario
+            TextField("Comentario (opcional)", text: $comment, axis: .vertical)
+                .lineLimit(3...5)
+                .padding()
+                .background(Color.gray.opacity(0.1))
+                .cornerRadius(12)
+                .padding(.horizontal)
+            
+            // Botón Enviar
+            Button(action: {
+                Task {
+                    if let revieweeId = applicantToRate {
+                        await viewModel.submitReview(
+                            revieweeId: revieweeId,
+                            rating: Double(rating),
+                            comment: comment
+                        )
+                        showRatingSheet = false
+                    }
+                }
+            }) {
+                Text("Enviar calificación")
+                    .font(.headline)
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(rating > 0 ? Color("FixyPrimary") : Color.gray)
+                    .cornerRadius(12)
+                    .padding(.horizontal)
+            }
+            .disabled(rating == 0) // No permite enviar si no hay estrellas
+            
+            Spacer()
+        }
+        .padding(.top, 24)
+    }
+    
+    // Textos dinámicos según las estrellas
+    private func ratingDescription(for rating: Int) -> String {
+        switch rating {
+        case 1: return "Muy deficiente"
+        case 2: return "Regular"
+        case 3: return "Bueno"
+        case 4: return "Muy bueno"
+        case 5: return "Excelente (+50% bonus)"
+        default: return "Selecciona una calificación"
+        }
+    }
 }
 
-
 #Preview {
-    // Le pasamos un UUID() vacío solo para que Xcode pueda dibujar la vista
     RequestDetailView(requestId: UUID())
 }

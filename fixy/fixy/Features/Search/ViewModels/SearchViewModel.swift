@@ -32,22 +32,24 @@ final class SearchViewModel {
     }
     
     func fetchRequests() async {
-        self.isLoading = true
-        do {
-            let fetched: [SearchRequestDTO] = try await SupabaseManager.shared.client
-                .from("requests")
-                .select("*, profiles(full_name, medal)")
-                .eq("status", value: "abierta")
-                .order("created_at", ascending: false)
-                .execute()
-                .value
-            
-            self.allRequests = fetched
-        } catch {
-            print("Error al descargar búsquedas: \(error)")
+            self.isLoading = true
+            do {
+                let fetched: [SearchRequestDTO] = try await SupabaseManager.shared.client
+                    .from("requests")
+                    .select("*, profiles(full_name, medal)")
+                    .eq("status", value: "abierta")
+                    //.gte("deadline", value: todayString)
+                    .order("created_at", ascending: false)
+                    .execute()
+                    .value
+                
+                print("Solicitudes totales (sin filtros): \(fetched.count)")
+                self.allRequests = fetched
+            } catch {
+                print("❌ Error: \(error)")
+            }
+            self.isLoading = false
         }
-        self.isLoading = false
-    }
     
     // Motor de filtrado en tiempo real
     var filteredRequests: [SearchRequestDTO] {

@@ -43,6 +43,10 @@ struct ProfileView: View {
                     // 1. Tarjeta Principal (Datos, Medalla, Stats, Bio)
                     mainInfoCard
                     
+                    // 🌟 2. Tarjeta Biografía (Separada y con su propio recuadro)
+                    if !viewModel.user.bio.isEmpty {bioCard
+                    }
+                    
                     // 2. Tarjeta de Tecnologías
                     technologiesCard
                     
@@ -173,33 +177,34 @@ struct ProfileView: View {
                         .foregroundColor(.secondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
-            } // 👈 Fin de VStack de la barra de progreso
-            
-            // 🌟 NUEVA SECCIÓN: BIOGRAFÍA 🌟
-            if !viewModel.user.bio.isEmpty {
-                Divider()
-                    .padding(.vertical, 4)
-                
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("SOBRE MÍ")
-                        .font(.caption2)
-                        .fontWeight(.bold)
-                        .foregroundColor(.secondary)
-                        .tracking(0.5)
-                    
-                    Text(viewModel.user.bio)
-                        .font(.subheadline)
-                        .foregroundColor(.primary)
-                        .fixedSize(horizontal: false, vertical: true) // Evita que se corte
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
             }
+            
         }
         .padding(20)
         .background(Color(UIColor.secondarySystemBackground))
         .cornerRadius(20)
         .padding(.horizontal, 20)
     }
+
+    // MARK: - Tarjeta: Biografía
+        private var bioCard: some View {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("SOBRE MÍ")
+                    .font(.caption)
+                    .fontWeight(.bold)
+                    .foregroundColor(.secondary)
+                
+                Text(viewModel.user.bio)
+                    .font(.subheadline)
+                    .foregroundColor(.primary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(20)
+            .background(Color(UIColor.secondarySystemBackground))
+            .cornerRadius(20)
+            .padding(.horizontal, 20)
+        }
     
     private func statBox(value: String, label: String, valueColor: Color) -> some View {
         VStack(spacing: 4) {

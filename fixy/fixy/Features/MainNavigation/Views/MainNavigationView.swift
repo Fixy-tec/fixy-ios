@@ -23,7 +23,7 @@ struct MainNavigationView: View {
                             .tag(MainTab.inicio)
             
             // 2. SOLICITUDES
-            RequestsView()
+            MyRequestsView()
                 .tabItem {
                     Image(systemName: viewModel.selectedTab == .solicitudes ? MainTab.solicitudes.selectedIconName : MainTab.solicitudes.iconName)
                     Text(MainTab.solicitudes.rawValue)

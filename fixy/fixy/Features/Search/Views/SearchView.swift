@@ -60,13 +60,10 @@ struct SearchView: View {
                     
                     // MARK: - CONTENIDO DINÁMICO (Resultados o Filtros Avanzados)
                     if viewModel.showAdvancedFilters {
-                        
-                        // 💡 SOLUCIÓN: Envolvemos todo el panel de filtros en un ScrollView independiente
-                        // para que nunca más se aplaste hacia arriba y se pueda deslizar libremente.
                         ScrollView(.vertical, showsIndicators: false) {
                             advancedFiltersPanel
                                 .padding(.top, 16)
-                                .padding(.bottom, 110) // Margen de seguridad para el FAB y el TabBar
+                                .padding(.bottom, 110)
                         }
                         
                     } else {
@@ -78,18 +75,36 @@ struct SearchView: View {
                             .padding(.horizontal)
                             .padding(.top, 16)
                             .padding(.bottom, 8)
+                            .multilineTextAlignment(.center)
                         
                         if viewModel.isLoading {
-                            Spacer(); ProgressView("Cargando solicitudes..."); Spacer()
-                        } else if viewModel.filteredRequests.isEmpty {
-                            Spacer()
-                            VStack(spacing: 12) {
-                                Image(systemName: "doc.text.magnifyingglass").font(.system(size: 40)).foregroundColor(.gray)
-                                Text("No se encontraron solicitudes abiertas.").foregroundColor(.secondary)
-                            }
-                            .frame(maxWidth: .infinity)
-                            Spacer()
-                        } else {
+                                                    // Carga centrada absoluta
+                                                    VStack {
+                                                        Spacer()
+                                                        ProgressView("Cargando solicitudes...")
+                                                            .padding(.top, 40)
+                                                        Spacer()
+                                                    }
+                                                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                                    
+                                                } else if viewModel.filteredRequests.isEmpty {
+                                                    // Estado vacío centrado absoluto
+                                                    VStack(spacing: 12) {
+                                                        Spacer()
+                                                        
+                                                        Image(systemName: "doc.text.magnifyingglass")
+                                                            .font(.system(size: 40))
+                                                            .foregroundColor(.gray)
+                                                        Text("No se encontraron solicitudes abiertas.")
+                                                            .foregroundColor(.secondary)
+                                                            .multilineTextAlignment(.center)
+                                                        
+                                                        Spacer()
+                                                    }
+                                                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                                    .padding(.top, 40)
+                                                    
+                                                } else {
                             // Lista de solicitudes
                             ScrollView(showsIndicators: false) {
                                 LazyVStack(spacing: 16) {
@@ -126,7 +141,14 @@ struct SearchView: View {
             .navigationBarTitleDisplayMode(.large)
             .background(Color(UIColor.systemBackground).ignoresSafeArea())
             .task { await viewModel.fetchRequests() }
-            .fullScreenCover(isPresented: $showCreateModal) { CreateRequestView() }
+            .fullScreenCover(isPresented: $showCreateModal, onDismiss: {
+                // 🌟 Esto obliga a recargar la base de datos justo al cerrar el modal
+                Task {
+                    await viewModel.fetchRequests()
+                }
+            }) {
+                CreateRequestView()
+            }
         }
     }
     
