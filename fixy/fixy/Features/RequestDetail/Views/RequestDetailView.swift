@@ -117,16 +117,31 @@ struct RequestDetailView: View {
         VStack(alignment: .leading, spacing: 16) {
             
             if viewModel.request?.status == "en_proceso" {
-                Button(action: { Task { await viewModel.markAsCompleted() } }) {
+                Button(action: {
+                    Task {
+                        // 1. Ejecutamos el cambio en Supabase
+                        await viewModel.markAsCompleted()
+                        
+                        // 2. 🌟 FORZAMOS LA RECARGA:
+                        // Esto actualiza el viewModel y dispara la actualización de la UI
+                        await viewModel.loadDetails(requestId: requestId)
+                    }
+                }) {
                     HStack {
                         Image(systemName: "checkmark.circle")
                         Text("Marcar como completada")
                     }
-                    .fontWeight(.bold).frame(maxWidth: .infinity).padding().background(Color("FixyPrimary")).foregroundColor(.white).cornerRadius(12)
+                    .fontWeight(.bold)
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(Color("FixyPrimary"))
+                    .foregroundColor(.white)
+                    .cornerRadius(12)
                 }
                 .padding(.bottom, 10)
                 
             } else if viewModel.request?.status == "completada" {
+                // Ahora, al recargarse el ViewModel, este bloque se activará automáticamente
                 if viewModel.applicants.contains(where: { $0.status == "aprobado" }) {
                     Button(action: {
                         if let approved = viewModel.applicants.first(where: { $0.status == "aprobado" }) {
@@ -139,7 +154,12 @@ struct RequestDetailView: View {
                             Image(systemName: "star.fill")
                             Text("Calificar trabajo")
                         }
-                        .fontWeight(.bold).frame(maxWidth: .infinity).padding().background(Color.yellow).foregroundColor(.white).cornerRadius(12)
+                        .fontWeight(.bold)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color.yellow)
+                        .foregroundColor(.white)
+                        .cornerRadius(12)
                     }
                     .padding(.bottom, 10)
                 }
