@@ -18,13 +18,12 @@ struct MyRequestDTO: Decodable, Identifiable {
     let difficulty: Int
     let deadline: String
     let price: Double?
-    let points_reward: Int
+    let points_reward: Int	
     let applicants_count: Int?
     let status: String?
     let created_at: String
-    
-    // Relación con el perfil del creador (para cuando vemos postulaciones)
     let profiles: CreatorProfileDTO?
+    let applications: [MyApplicationDTO]?
 }
 
 struct CreatorProfileDTO: Decodable {
