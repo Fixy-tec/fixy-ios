@@ -205,7 +205,7 @@ struct MyRequestsView: View {
     
     private func createdRequestCard(req: MyRequestDTO) -> some View {
         let isAbierta = req.status == "abierta"
-        let postulantes = req.applicants_count ?? 0
+        let postulantes = req.applications?.count ?? 0
         
         return VStack(alignment: .leading, spacing: 12) {
             HStack {
@@ -254,8 +254,8 @@ struct MyRequestsView: View {
                 .lineLimit(2)
             
             Text("\(postulantes) postulante\(postulantes == 1 ? "" : "s")")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
         }
         .padding(16)
         .background(Color(UIColor.secondarySystemBackground))
@@ -285,9 +285,9 @@ struct MyRequestsView: View {
                 .foregroundColor(.primary)
                 .lineLimit(2)
             
-            Text("\(req.applicants_count ?? 1) postulante(s) aceptado(s)")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
+            //Text("\(req.applicants_count ?? 1) postulante(s) aceptado(s)")
+                //.font(.subheadline)
+                //.foregroundColor(.secondary)
         }
         .padding(16)
         .background(Color(UIColor.secondarySystemBackground))
