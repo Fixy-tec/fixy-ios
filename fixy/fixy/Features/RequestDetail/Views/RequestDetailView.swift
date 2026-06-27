@@ -366,7 +366,7 @@ struct RequestDetailView: View {
             }
             .disabled(rating == 0) // No permite enviar si no hay estrellas
             
-            Spacer()
+ 	           Spacer()
         }
         .padding(.top, 24)
     }
