@@ -156,52 +156,55 @@ struct MyRequestsView: View {
     // MARK: - Diseño de Tarjetas (Cards)
     
     @ViewBuilder
-    private func applicationCard(app: MyApplicationDTO) -> some View {
-        // 🌟 SOLUCIÓN: Usamos if let en lugar de guard para que ViewBuilder haga su magia
-        if let request = app.requests {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    Text(request.type.capitalized)
-                        .font(.caption)
-                        .fontWeight(.bold)
-                        .foregroundColor(Color("FixyPrimary"))
-                    
-                    Spacer()
-                    
-                    // Pill de estado
-                    Text(app.status?.capitalized ?? "Pendiente")
-                        .font(.caption2)
-                        .fontWeight(.bold)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 4)
-                        .background(Color.yellow.opacity(0.2))
-                        .foregroundColor(.yellow)
-                        .cornerRadius(10)
-                    
-                    // Menú de acciones
-                    Menu {
-                        Button(role: .destructive, action: {
-                            Task { await viewModel.withdrawApplication(applicationId: app.id) }
-                        }) {
-                            Label("Retirar postulación", systemImage: "xmark.bin")
-                        }
-                    } label: {
-                        Image(systemName: "ellipsis")
-                            .foregroundColor(.primary)
-                            .padding(.leading, 8)
-                    }
-                }
+        private func applicationCard(app: MyApplicationDTO) -> some View {
+            if let request = app.requests {
                 
-                Text(request.title)
-                    .font(.headline)
-                    .foregroundColor(.primary)
-                    .lineLimit(2)
+                // 🌟 Evaluamos el estado (convertimos a minúsculas por si acaso)
+                let isAprobado = app.status?.lowercased() == "aprobado"
+                
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                        Text(request.type.capitalized)
+                            .font(.caption)
+                            .fontWeight(.bold)
+                            .foregroundColor(Color("FixyPrimary"))
+                        
+                        Spacer()
+                        
+                        // 🌟 Pill de estado dinámico (Verde si es aprobado, Amarillo si es pendiente)
+                        Text(app.status?.capitalized ?? "Pendiente")
+                            .font(.caption2)
+                            .fontWeight(.bold)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 4)
+                            .background(isAprobado ? Color.green.opacity(0.2) : Color.yellow.opacity(0.2))
+                            .foregroundColor(isAprobado ? .green : .yellow)
+                            .cornerRadius(10)
+                        
+                        // Menú de acciones
+                        Menu {
+                            Button(role: .destructive, action: {
+                                Task { await viewModel.withdrawApplication(applicationId: app.id) }
+                            }) {
+                                Label("Retirar postulación", systemImage: "xmark.bin")
+                            }
+                        } label: {
+                            Image(systemName: "ellipsis")
+                                .foregroundColor(.primary)
+                                .padding(.leading, 8)
+                        }
+                    }
+                    
+                    Text(request.title)
+                        .font(.headline)
+                        .foregroundColor(.primary)
+                        .lineLimit(2)
+                }
+                .padding(16)
+                .background(Color(UIColor.secondarySystemBackground))
+                .cornerRadius(16)
             }
-            .padding(16)
-            .background(Color(UIColor.secondarySystemBackground))
-            .cornerRadius(16)
         }
-    }
     
     private func createdRequestCard(req: MyRequestDTO) -> some View {
         let isAbierta = req.status == "abierta"
