@@ -332,8 +332,6 @@ struct MyRequestsView: View {
     }
     
     // MARK: - Estado Vacío (Empty State)
-    
-    // MARK: - Estado Vacío (Empty State)
         
         private func emptyStateView(message: String) -> some View {
             VStack(spacing: 16) {
