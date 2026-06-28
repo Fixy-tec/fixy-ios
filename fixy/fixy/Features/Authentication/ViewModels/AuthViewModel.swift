@@ -41,26 +41,26 @@ final class AuthViewModel {
         
         self.isLoading = false
     }
- 
-    // En AuthViewModel.swift
+    
     func signInWithGoogle() async {
-        self.isLoading = true
-        self.errorMessage = nil
-        
-        do {
-            let url = try SupabaseManager.shared.client.auth.getOAuthSignInURL(
-                provider: .google,
-                redirectTo: URL(string: "fixy://login-callback")
-            )
+            self.isLoading = true
+            self.errorMessage = nil
             
-            await MainActor.run {
-                UIApplication.shared.open(url)
+            do {
+                let url = try SupabaseManager.shared.client.auth.getOAuthSignInURL(
+                    provider: .google,
+                    redirectTo: URL(string: "fixy://login-callback"),
+                    queryParams: [(name: "prompt", value: "select_account")]
+                )
+                
+                await MainActor.run {
+                    UIApplication.shared.open(url)
+                }
+            } catch {
+                print("Error al generar URL de Google: \(error)")
+                self.errorMessage = "No se pudo conectar con Google."
             }
-        } catch {
-            print("Error al generar URL de Google: \(error)")
-            self.errorMessage = "No se pudo conectar con Google."
+            
+            self.isLoading = false
         }
-        
-        self.isLoading = false
-    }
 }
