@@ -112,7 +112,6 @@ final class RequestDetailViewModel {
         }
     }
     
-    // 🌟 NUEVA FUNCIÓN AÑADIDA: Rechazar Postulante
     func rejectApplicant(applicationId: UUID) async {
         guard let req = request else { return }
         do {
