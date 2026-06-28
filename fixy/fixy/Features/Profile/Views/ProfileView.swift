@@ -63,8 +63,6 @@ struct ProfileView: View {
                 }
             }
             .background(Color(UIColor.systemBackground).ignoresSafeArea())
-            // 🌟 AQUÍ ESTÁ EL CAMBIO MAGICO:
-            // Esto actualiza los puntos y progreso cada vez que la vista aparece
             .task {
                 await viewModel.fetchFullProfile(showLoader: false)
             }
