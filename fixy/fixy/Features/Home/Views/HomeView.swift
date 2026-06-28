@@ -107,7 +107,7 @@ struct HomeView: View {
                                     .frame(width: 16, height: 16)
                                     .background(Color.red)
                                     .clipShape(Circle())
-                                    .offset(x: 4, y: -4)
+                                    .offset(x: 5, y: -5)
                             }
                         }
                     }
