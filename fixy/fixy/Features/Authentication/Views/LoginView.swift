@@ -5,6 +5,13 @@
 //  Created by yordan on 18/06/26.
 //
 
+//
+//  LoginView.swift
+//  fixy
+//
+//  Created by yordan on 18/06/26.
+//
+
 import SwiftUI
 
 struct LoginView: View {
@@ -15,16 +22,15 @@ struct LoginView: View {
     
     var body: some View {
         NavigationStack {
-            VStack(spacing: 24) {
+            VStack(spacing: 0) { // 🌟
                 Spacer()
                 
                 // 1. Logo
-                // Asegúrate de arrastrar la imagen de tu logo a Assets y nombrarla "FixyLogo"
                 Image("FixyLogo")
                     .resizable()
                     .scaledToFit()
                     .frame(height: 80)
-                    .padding(.bottom, 8)
+                    .padding(.bottom, 16)
                 
                 // 2. Textos de Bienvenida
                 VStack(spacing: 8) {
@@ -37,7 +43,7 @@ struct LoginView: View {
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                 }
-                .padding(.bottom, 16)
+                .padding(.bottom, 32) // 🌟 Más espacio antes del formulario
                 
                 // 3. Campos de Texto
                 VStack(spacing: 16) {
@@ -46,12 +52,12 @@ struct LoginView: View {
                         Image(systemName: "envelope")
                             .foregroundColor(.gray)
                         
-                        TextField("Correo Tecsup", text: $viewModel.email)
+                        TextField("Correo", text: $viewModel.email)
                             .keyboardType(.emailAddress)
                             .autocapitalization(.none)
                     }
                     .padding()
-                    .background(Color(UIColor.secondarySystemBackground)) // El gris claro de tu diseño
+                    .background(Color(UIColor.secondarySystemBackground))
                     .cornerRadius(12)
                     
                     // Campo: Contraseña
@@ -60,10 +66,10 @@ struct LoginView: View {
                             .foregroundColor(.gray)
                         
                         if isPasswordVisible {
-                            TextField("Contrasena", text: $viewModel.password)
+                            TextField("Contraseña", text: $viewModel.password)
                                 .autocapitalization(.none)
                         } else {
-                            SecureField("Contrasena", text: $viewModel.password)
+                            SecureField("Contraseña", text: $viewModel.password)
                                 .autocapitalization(.none)
                         }
                         
@@ -81,12 +87,16 @@ struct LoginView: View {
                     .background(Color(UIColor.secondarySystemBackground))
                     .cornerRadius(12)
                 }
+                .padding(.bottom, 8)
                 
                 // Mensaje de Error (si ocurre)
                 if let errorMessage = viewModel.errorMessage {
                     Text(errorMessage)
                         .font(.caption)
                         .foregroundColor(Color("FixyPointsNegative"))
+                        .padding(.bottom, 8)
+                } else {
+                    Spacer().frame(height: 24) // Espacio fantasma si no hay error
                 }
                 
                 // 4. Botón Principal
@@ -99,20 +109,60 @@ struct LoginView: View {
                         ProgressView()
                             .progressViewStyle(CircularProgressViewStyle(tint: .white))
                     } else {
-                        Text("Iniciar sesion")
+                        Text("Iniciar sesión")
                     }
                 }
                 .fixyPrimaryButtonStyle()
                 .disabled(viewModel.isLoading)
-                .padding(.top, 8)
                 
-                // 5. Botón Crear Cuenta
-                NavigationLink(destination: RegisterView()) {
-                    Text("Crear cuenta nueva")
-                        .font(.callout)
-                        .foregroundColor(Color("FixyPrimary"))
+                // 🌟 5. Separador Estético
+                HStack {
+                    VStack { Divider() }
+                    Text("O continuar con")
+                        .font(.footnote)
+                        .foregroundColor(.secondary)
+                        .padding(.horizontal, 8)
+                    VStack { Divider() }
                 }
-                .padding(.top, 8)
+                .padding(.vertical, 24)
+                
+                // 🌟 6. Botón de Google
+                Button(action: {
+                    Task {
+                        await viewModel.signInWithGoogle()
+                    }
+                }) {
+                    HStack(spacing: 12) {
+                        // Cambia "globe" por "google_logo" si tienes la imagen real en tus Assets
+                        Image(systemName: "globe")
+                            .font(.title3)
+                        Text("Google")
+                            .font(.headline)
+                            .fontWeight(.semibold)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(Color(UIColor.systemBackground))
+                    .foregroundColor(.primary)
+                    .cornerRadius(12)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color.gray.opacity(0.3), lineWidth: 1)
+                    )
+                }
+                .padding(.bottom, 32)
+                
+                // 7. Botón Crear Cuenta
+                NavigationLink(destination: RegisterView()) {
+                    HStack(spacing: 4) {
+                        Text("¿No tienes cuenta?")
+                            .foregroundColor(.secondary)
+                        Text("Regístrate")
+                            .fontWeight(.bold)
+                            .foregroundColor(Color("FixyPrimary"))
+                    }
+                    .font(.callout)
+                }
                 
                 Spacer()
             }
