@@ -210,8 +210,19 @@ struct RequestDetailView: View {
                         
                         if applicant.status == "pendiente" && viewModel.request?.status == "abierta" {
                             HStack(spacing: 12) {
-                                Button(action: {}) {
-                                    Text("Rechazar").frame(maxWidth: .infinity).padding(.vertical, 10).background(Color.white).foregroundColor(.primary).overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.gray.opacity(0.3), lineWidth: 1))
+                                Button(action: {
+                                    Task {
+                                        await viewModel.rejectApplicant(applicationId: applicant.id)
+                                    }
+                                }) {
+                                    Text("Rechazar")
+                                        .font(.subheadline)
+                                        .fontWeight(.bold)
+                                        .foregroundColor(.white)
+                                        .padding(.horizontal, 20)
+                                        .padding(.vertical, 10)
+                                        .background(Color.red)
+                                        .cornerRadius(8)
                                 }
                                 Button(action: {
                                     Task { await viewModel.acceptApplicant(applicationId: applicant.id) }
