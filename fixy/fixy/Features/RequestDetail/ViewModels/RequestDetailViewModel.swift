@@ -112,6 +112,21 @@ final class RequestDetailViewModel {
         }
     }
     
+    // 🌟 NUEVA FUNCIÓN AÑADIDA: Rechazar Postulante
+    func rejectApplicant(applicationId: UUID) async {
+        guard let req = request else { return }
+        do {
+            // 1. Actualizar el estado de la postulación a 'rechazado'
+            try await SupabaseManager.shared.client.from("applications").update(["status": "rechazado"]).eq("id", value: applicationId).execute()
+            
+            // 2. Refrescar los datos en pantalla
+            await loadDetails(requestId: req.id)
+            
+        } catch {
+            print("Error al rechazar postulante: \(error)")
+        }
+    }
+    
     func markAsCompleted() async {
         guard let req = request else { return }
         do {
