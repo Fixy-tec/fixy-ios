@@ -13,10 +13,10 @@ struct RankingView: View {
     
     // Animación de flotabilidad (Banner)
     @State private var isAnimatingMedals = false
-    // 🌟 Animación de toque (Carrusel)
+    // Animación de toque (Carrusel)
     @State private var tappedMedal: String? = nil
     
-    // 🌟 Lista de filtros completa y en orden
+    // Lista de filtros completa y en orden
     let rankFilters = ["Todos", "Challenger", "Maestro", "Diamante", "Oro", "Plata", "Bronce", "Hierro"]
     
     var body: some View {
@@ -59,7 +59,8 @@ struct RankingView: View {
                         .stroke(Color("FixyPrimary"), style: StrokeStyle(lineWidth: 8, lineCap: .round))
                         .rotationEffect(.degrees(-90))
                     
-                    Image((viewModel.currentUser?.medal ?? "diamante").lowercased())
+                    // 🌟 Corrección: Usamos el tier calculado en lugar del dato estático de la DB
+                    Image((viewModel.currentTier?.name ?? "hierro").lowercased())
                         .resizable()
                         .scaledToFit()
                         .frame(width: 50, height: 50)
@@ -93,7 +94,7 @@ struct RankingView: View {
             VStack(spacing: 8) {
                 GeometryReader { geometry in
                     ZStack(alignment: .leading) {
-                        RoundedRectangle(cornerRadius: 4).fill(Color(UIColor.tertiarySystemBackground)).frame(height: 8)
+                        RoundedRectangle(cornerRadius: 4).fill(Color.gray.opacity(0.3)).frame(height: 8)
                         RoundedRectangle(cornerRadius: 4).fill(Color("FixyPrimary"))
                             .frame(width: max(0, geometry.size.width * viewModel.progressPercentage), height: 8)
                     }
@@ -101,12 +102,13 @@ struct RankingView: View {
                 .frame(height: 8)
                 
                 HStack {
-                    Text("\(viewModel.currentTier?.minPoints ?? 0) pts")
+                    // 🌟 Corrección: Textos más claros para evitar confusiones matemáticas
+                    Text("Base: \(viewModel.currentTier?.minPoints ?? 0) pts")
                     Spacer()
                     if let next = viewModel.nextTier {
                         Text("\(viewModel.pointsToNextRank) pts para \(next.name)").foregroundColor(.secondary)
                         Spacer()
-                        Text("\(next.minPoints) pts")
+                        Text("Meta: \(next.minPoints) pts")
                     } else {
                         Text("Rango Máximo").foregroundColor(.secondary)
                         Spacer()
@@ -129,7 +131,7 @@ struct RankingView: View {
             .padding(.horizontal)
             
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 12) { // 🌟 Reducimos el espaciado
+                HStack(spacing: 12) {
                     ForEach(viewModel.allTiers, id: \.name) { tier in
                         let isCurrentTier = viewModel.currentTier?.name == tier.name
                         let isTapped = tappedMedal == tier.name
@@ -137,7 +139,7 @@ struct RankingView: View {
                         VStack(spacing: 10) {
                             if isCurrentTier {
                                 Text("Tu aqui")
-                                    .font(.system(size: 10, weight: .bold)) // Letra más pequeña
+                                    .font(.system(size: 10, weight: .bold))
                                     .foregroundColor(.white)
                                     .padding(.horizontal, 8).padding(.vertical, 4)
                                     .background(Color("FixyPrimary"))
@@ -149,8 +151,7 @@ struct RankingView: View {
                             Image(tier.name.lowercased())
                                 .resizable()
                                 .scaledToFit()
-                                .frame(width: 45, height: 45) // 🌟 Imagen un poco más chica
-                                // 🌟 EFECTO DE ANIMACIÓN: Sombreado dinámico y giro de lado a lado
+                                .frame(width: 45, height: 45)
                                 .shadow(color: isTapped ? Color("FixyPrimary").opacity(0.8) : Color.clear, radius: isTapped ? 15 : 0)
                                 .rotationEffect(.degrees(isTapped ? 15 : 0))
                                 .animation(.spring(response: 0.2, dampingFraction: 0.2), value: isTapped)
@@ -161,17 +162,15 @@ struct RankingView: View {
                             }
                         }
                         .padding(.vertical, 14)
-                        .frame(width: 105) // 🌟 Reducimos el ancho de las tarjetas
+                        .frame(width: 105)
                         .background(Color(UIColor.systemBackground))
                         .cornerRadius(18)
                         .overlay(
                             RoundedRectangle(cornerRadius: 18)
                                 .stroke(isCurrentTier ? Color("FixyPrimary") : Color.gray.opacity(0.3), lineWidth: isCurrentTier ? 2 : 1)
                         )
-                        // 🌟 GESTO DE TOQUE
                         .onTapGesture {
                             tappedMedal = tier.name
-                            // Vuelve a su estado original después de un instante para dar sensación de "rebote"
                             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                                 tappedMedal = nil
                             }
@@ -194,7 +193,6 @@ struct RankingView: View {
             .foregroundColor(.secondary)
             .padding(.horizontal)
             
-            // 🌟 Píldoras de filtrado actualizadas
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 10) {
                     ForEach(rankFilters, id: \.self) { rank in
@@ -258,7 +256,8 @@ struct RankingView: View {
             
             Spacer()
             
-            Image((student.medal ?? "Hierro").lowercased())
+            // 🌟 Corrección: Calculamos la imagen dinámicamente según los puntos reales
+            Image(getMedalImage(for: student.total_points ?? 0))
                 .resizable()
                 .scaledToFit()
                 .frame(width: 28, height: 28)
@@ -267,6 +266,18 @@ struct RankingView: View {
         .background(Color(UIColor.systemBackground))
         .cornerRadius(20)
         .overlay(RoundedRectangle(cornerRadius: 20).stroke(isMe ? Color("FixyPrimary") : Color.clear, lineWidth: 2))
+    }
+
+    private func getMedalImage(for points: Int) -> String {
+        switch points {
+        case 0...499: return "hierro"
+        case 500...999: return "bronce"
+        case 1000...1999: return "plata"
+        case 2000...3499: return "oro"
+        case 3500...5999: return "diamante"
+        case 6000...9999: return "maestro"
+        default: return "challenger"
+        }
     }
 }
 
