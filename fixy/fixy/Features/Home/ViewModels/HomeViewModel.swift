@@ -17,12 +17,15 @@ final class HomeViewModel {
     var isLoading: Bool = false
     
     // Nuevas variables para Notificaciones
-    var recentNotifications: [NotificationDTO] = []
+    var recentNotifications: [NotificationModel] = []
     var unreadCount: Int = 0
     
     func loadUserData() async {
         self.isLoading = true
-        guard let userId = SupabaseManager.shared.client.auth.currentUser?.id else { return }
+        guard let userId = SupabaseManager.shared.client.auth.currentUser?.id else {
+            self.isLoading = false
+            return
+        }
         
         do {
             // 1. Cargar Perfil
@@ -38,7 +41,7 @@ final class HomeViewModel {
             self.technologies = profile.technologies ?? []
             
             // 2. Cargar Notificaciones (Traemos las últimas 3 para el Home)
-            let fetchedNotifications: [NotificationDTO] = try await SupabaseManager.shared.client
+            let fetchedNotifications: [NotificationModel] = try await SupabaseManager.shared.client
                 .from("notifications")
                 .select()
                 .eq("user_id", value: userId)
@@ -49,11 +52,11 @@ final class HomeViewModel {
             
             self.recentNotifications = fetchedNotifications
             
-            // Contamos cuántas no han sido leídas
-            self.unreadCount = fetchedNotifications.filter { !$0.is_read }.count
+            // Contamos cuántas no han sido leídas manejando correctamente el opcional
+            self.unreadCount = fetchedNotifications.filter { !($0.is_read ?? false) }.count
             
         } catch {
-            print("❌ Error cargando Home: \(error)")
+            print("Error cargando Home: \(error)")
         }
         self.isLoading = false
     }

@@ -58,7 +58,7 @@ struct HomeView: View {
                         }
                     }
                     .padding(20)
-                    // 👇 AQUÍ ESTÁ EL DEGRADADO EXACTO DE TU IMAGEN
+                    
                     .background(
                         LinearGradient(
                             colors: [Color.cyan, Color.blue],
@@ -83,10 +83,10 @@ struct HomeView: View {
             .toolbar {
                 // Lado Izquierdo: LOGO
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Image("FixyLogo") // ⚠️ Cambia esto por el nombre exacto de tu imagen en Assets
+                    Image("FixyLogo")
                         .resizable()
                         .scaledToFit()
-                        .frame(height: 75) // Altura ajustada para que no se vea gigante
+                        .frame(height: 75)
                 }
                 
                 // Lado Derecho: CAMPANA DE NOTIFICACIONES
@@ -100,7 +100,6 @@ struct HomeView: View {
                                 .background(Color.blue.opacity(0.1))
                                 .clipShape(Circle())
                             
-                            // Burbuja roja (Solo aparece si hay notificaciones sin leer)
                             if viewModel.unreadCount > 0 {
                                 Text("\(viewModel.unreadCount)")
                                     .font(.system(size: 10, weight: .bold))
@@ -108,14 +107,14 @@ struct HomeView: View {
                                     .frame(width: 16, height: 16)
                                     .background(Color.red)
                                     .clipShape(Circle())
-                                    .offset(x: 2, y: -2)
+                                    .offset(x: 4, y: -4)
                             }
                         }
                     }
                 }
             }
         }
-    } // 👈 ¡ESTA ES LA PRIMERA LLAVE QUE FALTABA! (Cierra la variable 'body')
+    }
     
     // MARK: - Sección de Notificaciones
     private var notificationSection: some View {
@@ -130,7 +129,7 @@ struct HomeView: View {
                     .padding(.horizontal)
             } else {
                 ForEach(viewModel.recentNotifications) { notification in
-                    // Si la notificación tiene un ID de solicitud, nos lleva al Detalle real
+
                     NavigationLink(destination: Group {
                         if let reqId = notification.related_request_id {
                             RequestDetailView(requestId: reqId)
@@ -140,14 +139,14 @@ struct HomeView: View {
                     }) {
                         HStack(alignment: .top, spacing: 15) {
                             Circle()
-                                .fill(notification.is_read ? Color.clear : Color.cyan)
+                                .fill((notification.is_read ?? false) ? Color.clear : Color.cyan)
                                 .frame(width: 8, height: 8)
                                 .padding(.top, 5)
                             
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(notification.title)
                                     .font(.subheadline)
-                                    .fontWeight(notification.is_read ? .regular : .medium)
+                                    .fontWeight((notification.is_read ?? false) ? .regular : .medium)
                                     .foregroundColor(.primary)
                                     .multilineTextAlignment(.leading)
                                 
