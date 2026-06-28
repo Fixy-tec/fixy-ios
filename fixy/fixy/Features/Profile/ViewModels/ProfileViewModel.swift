@@ -39,12 +39,18 @@ final class ProfileViewModel {
     ]
     
     init() {
-        Task { await fetchFullProfile() }
+        // La primera vez sí mostramos la pantalla de carga
+        Task { await fetchFullProfile(showLoader: true) }
     }
     
-    func fetchFullProfile() async {
-        self.isLoading = true
-        guard let myId = SupabaseManager.shared.client.auth.currentUser?.id else { return }
+    // 🌟 AÑADIDO: showLoader para decidir si mostramos el spinner o si actualizamos en silencio
+    func fetchFullProfile(showLoader: Bool = true) async {
+        if showLoader { self.isLoading = true }
+        
+        guard let myId = SupabaseManager.shared.client.auth.currentUser?.id else {
+            self.isLoading = false
+            return
+        }
         
         do {
             // 1. Descargar Perfil (Obligatorio)
@@ -66,61 +72,65 @@ final class ProfileViewModel {
                 .execute()
                 .count) ?? 0
             
-                        var dynamicLinks: [UserLinkDTO] = []
-                        
-                        if let git = profile.github_url, !git.isEmpty {
-                            dynamicLinks.append(UserLinkDTO(id: UUID(), title: "GitHub", url: git, icon_name: "chevron.left.forward.slash"))
-                        }
-                        if let lin = profile.linkedin_url, !lin.isEmpty {
-                            dynamicLinks.append(UserLinkDTO(id: UUID(), title: "LinkedIn", url: lin, icon_name: "briefcase"))
-                        }
-                        if let port = profile.portfolio_url, !port.isEmpty {
-                            dynamicLinks.append(UserLinkDTO(id: UUID(), title: "Portafolio", url: port, icon_name: "globe"))
-                        }
-                        
-                        // 4. Descargar Reviews (Queda igual)
-                        let reviews: [UserReviewDTO] = (try? await SupabaseManager.shared.client
-                            .from("user_reviews")
-                            .select()
-                            .eq("reviewee_id", value: myId)
-                            .order("created_at", ascending: false)
-                            .execute()
-                            .value) ?? []
-                        
-                        // 5. Ensamblar modelo para la vista
-                        let name = profile.full_name ?? "Estudiante"
-                        let cycleString = profile.cycle != nil ? "\(profile.cycle!)° Ciclo" : "1er Ciclo"
-                        
-                        self.user = ProfilePresentationModel(
-                            id: profile.id,
-                            initials: String(name.prefix(2)).uppercased(),
-                            avatarId: profile.avatar_id,
-                            fullName: name,
-                            career: profile.career ?? "Sin carrera asignada",
-                            cycle: cycleString,
-                            points: myPoints,
-                            rankingPosition: higherUsersCount + 1,
-                            rating: profile.rating ?? 5.0,
-                            completedTasks: profile.completed_tasks ?? 0,
-                            technologies: Set(profile.technologies ?? []),
-                            phoneNumber: profile.phone_number ?? "",
-                            links: dynamicLinks, // 👈 Pasamos los links que acabamos de armar
-                            reviews: reviews,
-                            bio: profile.bio ?? "",
-                            githubUrl: profile.github_url ?? "",
-                            linkedinUrl: profile.linkedin_url ?? "",
-                            portfolioUrl: profile.portfolio_url ?? ""
-                        )
+            var dynamicLinks: [UserLinkDTO] = []
+            
+            if let git = profile.github_url, !git.isEmpty {
+                dynamicLinks.append(UserLinkDTO(id: UUID(), title: "GitHub", url: git, icon_name: "terminal"))
+            }
+            if let lin = profile.linkedin_url, !lin.isEmpty {
+                dynamicLinks.append(UserLinkDTO(id: UUID(), title: "LinkedIn", url: lin, icon_name: "briefcase"))
+            }
+            if let port = profile.portfolio_url, !port.isEmpty {
+                dynamicLinks.append(UserLinkDTO(id: UUID(), title: "Portafolio", url: port, icon_name: "globe"))
+            }
+            
+            // 4. Descargar Reviews (Queda igual)
+            let reviews: [UserReviewDTO] = (try? await SupabaseManager.shared.client
+                .from("user_reviews")
+                .select()
+                .eq("reviewee_id", value: myId)
+                .order("created_at", ascending: false)
+                .execute()
+                .value) ?? []
+            
+            // 5. Ensamblar modelo para la vista
+            let name = profile.full_name ?? "Estudiante"
+            let cycleString = profile.cycle != nil ? "\(profile.cycle!)° Ciclo" : "1er Ciclo"
+            
+            self.user = ProfilePresentationModel(
+                id: profile.id,
+                initials: String(name.prefix(2)).uppercased(),
+                avatarId: profile.avatar_id,
+                fullName: name,
+                career: profile.career ?? "Sin carrera asignada",
+                cycle: cycleString,
+                points: myPoints,
+                rankingPosition: higherUsersCount + 1,
+                rating: profile.rating ?? 5.0,
+                completedTasks: profile.completed_tasks ?? 0,
+                technologies: Set(profile.technologies ?? []),
+                phoneNumber: profile.phone_number ?? "",
+                links: dynamicLinks,
+                reviews: reviews,
+                bio: profile.bio ?? "",
+                githubUrl: profile.github_url ?? "",
+                linkedinUrl: profile.linkedin_url ?? "",
+                portfolioUrl: profile.portfolio_url ?? ""
+            )
             
         } catch {
             print("Error cargando perfil: \(error)")
-            self.user.fullName = "Error al cargar"
-            self.user.initials = "!!"
+            if self.user.fullName.isEmpty {
+                self.user.fullName = "Error al cargar"
+                self.user.initials = "!!"
+            }
         }
+        
+        // 🌟 Siempre quitamos el loading al terminar
         self.isLoading = false
     }
     
-    // MARK: - Cálculos de Medallas
+    // MARK: - Cálculos de Medallas (¡Quedan idénticos, están perfectos!)
     
     var currentMedal: MedalDisplay {
         let pts = user.points
@@ -147,14 +157,11 @@ final class ProfileViewModel {
     
     // MARK: - Funciones de Edición de tu Vista
     
-    func prepareEditTech() {
-        self.tempTechnologies = self.user.technologies
-    }
+    func prepareEditTech() { self.tempTechnologies = self.user.technologies }
     
     func saveTech() {
         let tagsArray = Array(tempTechnologies)
-        self.user.technologies = self.tempTechnologies // Actualización local instantánea
-        
+        self.user.technologies = self.tempTechnologies
         Task {
             do {
                 try await SupabaseManager.shared.client
@@ -162,19 +169,14 @@ final class ProfileViewModel {
                     .update(["technologies": tagsArray])
                     .eq("id", value: user.id)
                     .execute()
-            } catch {
-                print("Error guardando tags: \(error)")
-            }
+            } catch { print("Error guardando tags: \(error)") }
         }
     }
     
-    func prepareEditPhone() {
-        self.tempPhoneNumber = self.user.phoneNumber
-    }
+    func prepareEditPhone() { self.tempPhoneNumber = self.user.phoneNumber }
     
     func savePhone() {
-        self.user.phoneNumber = self.tempPhoneNumber // Actualización local instantánea
-        
+        self.user.phoneNumber = self.tempPhoneNumber
         Task {
             do {
                 try await SupabaseManager.shared.client
@@ -182,37 +184,28 @@ final class ProfileViewModel {
                     .update(["phone_number": tempPhoneNumber])
                     .eq("id", value: user.id)
                     .execute()
-            } catch {
-                print("Error guardando teléfono: \(error)")
-            }
+            } catch { print("Error guardando teléfono: \(error)") }
         }
     }
     
     func signOut() async {
         do {
             try await SupabaseManager.shared.client.auth.signOut()
-        } catch {
-            print("Error cerrando sesión: \(error)")
-        }
+        } catch { print("Error cerrando sesión: \(error)") }
     }
     
-    func prepareEditAvatar() {
-            self.tempAvatarId = self.user.avatarId
+    func prepareEditAvatar() { self.tempAvatarId = self.user.avatarId }
+    
+    func saveAvatar(newAvatar: String) {
+        self.user.avatarId = newAvatar
+        Task {
+            do {
+                try await SupabaseManager.shared.client
+                    .from("profiles")
+                    .update(["avatar_id": newAvatar])
+                    .eq("id", value: user.id)
+                    .execute()
+            } catch { print("Error guardando avatar: \(error)") }
         }
-        
-        func saveAvatar(newAvatar: String) {
-            self.user.avatarId = newAvatar
-            
-            Task {
-                do {
-                    try await SupabaseManager.shared.client
-                        .from("profiles")
-                        .update(["avatar_id": newAvatar])
-                        .eq("id", value: user.id)
-                        .execute()
-                } catch {
-                    print("Error guardando avatar: \(error)")
-                }
-            }
-        }
+    }
 }

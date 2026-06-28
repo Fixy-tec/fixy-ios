@@ -9,8 +9,7 @@ import SwiftUI
 
 struct ProfileView: View {
     @State private var viewModel = ProfileViewModel()
-    
-    // Controles para abrir los modales
+
     @State private var showEditTech = false
     @State private var showEditPhone = false
     @State private var showEditProfile = false
@@ -44,7 +43,8 @@ struct ProfileView: View {
                     mainInfoCard
                     
                     // 🌟 2. Tarjeta Biografía (Separada y con su propio recuadro)
-                    if !viewModel.user.bio.isEmpty {bioCard
+                    if !viewModel.user.bio.isEmpty {
+                        bioCard
                     }
                     
                     // 2. Tarjeta de Tecnologías
@@ -63,6 +63,11 @@ struct ProfileView: View {
                 }
             }
             .background(Color(UIColor.systemBackground).ignoresSafeArea())
+            // 🌟 AQUÍ ESTÁ EL CAMBIO MAGICO:
+            // Esto actualiza los puntos y progreso cada vez que la vista aparece
+            .task {
+                await viewModel.fetchFullProfile(showLoader: false)
+            }
             // Modales (Bottom Sheets)
             .sheet(isPresented: $showEditTech) {
                 editTechnologiesSheet
@@ -75,7 +80,7 @@ struct ProfileView: View {
                     .presentationDragIndicator(.visible)
             }
             .fullScreenCover(isPresented: $showEditProfile, onDismiss: {
-                Task { await viewModel.fetchFullProfile() }
+                Task { await viewModel.fetchFullProfile(showLoader: true) }
             }) {
                 EditProfileView(currentUser: viewModel.user)
             }
@@ -187,24 +192,24 @@ struct ProfileView: View {
     }
 
     // MARK: - Tarjeta: Biografía
-        private var bioCard: some View {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("SOBRE MÍ")
-                    .font(.caption)
-                    .fontWeight(.bold)
-                    .foregroundColor(.secondary)
+    private var bioCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("SOBRE MÍ")
+                .font(.caption)
+                .fontWeight(.bold)
+                .foregroundColor(.secondary)
                 
-                Text(viewModel.user.bio)
-                    .font(.subheadline)
-                    .foregroundColor(.primary)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .padding(20)
-            .background(Color(UIColor.secondarySystemBackground))
-            .cornerRadius(20)
-            .padding(.horizontal, 20)
+            Text(viewModel.user.bio)
+                .font(.subheadline)
+                .foregroundColor(.primary)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .padding(20)
+        .background(Color(UIColor.secondarySystemBackground))
+        .cornerRadius(20)
+        .padding(.horizontal, 20)
+    }
     
     private func statBox(value: String, label: String, valueColor: Color) -> some View {
         VStack(spacing: 4) {
