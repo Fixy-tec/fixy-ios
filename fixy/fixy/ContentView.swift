@@ -8,9 +8,7 @@
 import SwiftUI
 
 struct ContentView: View {
-    // Variable que controla qué pantalla estamos viendo
     @State private var isAuthenticated = false
-    
     var body: some View {
         Group {
             if isAuthenticated {
